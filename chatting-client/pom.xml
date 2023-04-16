@@ -28,17 +28,11 @@
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
         </dependency>
-        <dependency>
-            <groupId>cn.edu.sustech.cs209.chatting</groupId>
-            <artifactId>chatting-server</artifactId>
-            <version>${project.version}</version>
-            <scope>compile</scope>
-        </dependency>
+
         <dependency>
             <groupId>cn.edu.sustech.cs209.chatting</groupId>
             <artifactId>chatting-common</artifactId>
-            <version>${project.version}</version>
-            <scope>compile</scope>
+            <version>dev-SNAPSHOT</version>
         </dependency>
     </dependencies>
 

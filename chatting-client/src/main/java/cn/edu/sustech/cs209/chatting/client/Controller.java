@@ -1,7 +1,7 @@
 package cn.edu.sustech.cs209.chatting.client;
 
 import cn.edu.sustech.cs209.chatting.common.Message;
-import cn.edu.sustech.cs209.chatting.server.ServerController;
+import cn.edu.sustech.cs209.chatting.common.MessageType;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -14,29 +14,40 @@ import javafx.stage.Stage;
 import javafx.util.Callback;
 
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.concurrent.atomic.AtomicReference;
 
+import java.net.*;
+import java.io.*;
 
 public class Controller implements Initializable {
+
+    Socket socket;
 
     @FXML
     ListView<Message> chatContentList;
 
     String username;
 
-    ServerController sc;
+    private InputStream is;
+    private ObjectInputStream input;
 
-    public Controller(ServerController sc) {
-        this.sc = sc;
-    }
+    private OutputStream os;
+    private ObjectOutputStream output;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-
+        try {
+            this.socket = new Socket("localhost",25250);
+            os = socket.getOutputStream();
+            output = new ObjectOutputStream(os);
+            is = socket.getInputStream();
+            input = new ObjectInputStream(is);
+        } catch (IOException e) {
+            System.err.println("Cannot connect:(");
+        }
         Dialog<String> dialog = new TextInputDialog();
         dialog.setTitle("Login");
         dialog.setHeaderText(null);
@@ -44,14 +55,16 @@ public class Controller implements Initializable {
 
         Optional<String> input = dialog.showAndWait();
         if (input.isPresent() && !input.get().isEmpty()) {
-            if (!sc.userList.contains(input.get())){
-                username = input.get();
-                sc.userList.add(username);
-            }
             /*
                TODO: Check if there is a user with the same name among the currently logged-in users,
                      if so, ask the user to change the username
              */
+            username = input.get();
+            try {
+                doSendMessage();//"server","",MessageType.Register
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         } else {
             System.out.println("Invalid username " + input + ", exiting");
             Platform.exit();
@@ -108,8 +121,9 @@ public class Controller implements Initializable {
      * After sending the message, you should clear the text input field.
      */
     @FXML
-    public void doSendMessage() {
-        // TODO
+    public void doSendMessage() throws IOException {//String sendTo, String data, MessageType type
+//        Message msg = new Message(System.currentTimeMillis(),this.username,sendTo,data,type);
+//        output.writeObject(msg);
     }
 
     /**

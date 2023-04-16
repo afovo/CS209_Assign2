@@ -1,7 +1,7 @@
 package cn.edu.sustech.cs209.chatting.common;
 
-public class Message {
 
+public class Message {
     private Long timestamp;
 
     private String sentBy;
@@ -10,11 +10,15 @@ public class Message {
 
     private String data;
 
-    public Message(Long timestamp, String sentBy, String sendTo, String data) {
+    private MessageType type;
+
+
+    public Message(Long timestamp, String sentBy, String sendTo, String data, MessageType type) {
         this.timestamp = timestamp;
         this.sentBy = sentBy;
         this.sendTo = sendTo;
         this.data = data;
+        this.type = type;
     }
 
     public Long getTimestamp() {
@@ -32,4 +36,6 @@ public class Message {
     public String getData() {
         return data;
     }
+
+    public MessageType getType() {return type;}
 }
