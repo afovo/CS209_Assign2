@@ -9,6 +9,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -24,6 +25,10 @@ import java.io.*;
 
 public class Controller implements Initializable {
 
+    public ListView chatList;
+    public TextArea inputArea;
+    public Label currentUsername;
+    public Label currentOnlineCnt;
     Socket socket;
 
     @FXML
@@ -48,40 +53,94 @@ public class Controller implements Initializable {
         } catch (IOException e) {
             System.err.println("Cannot connect:(");
         }
-        Dialog<String> dialog = new TextInputDialog();
-        dialog.setTitle("Login");
-        dialog.setHeaderText(null);
-        dialog.setContentText("Username:");
+// Create the custom dialog.
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Login Dialog");
+        dialog.setHeaderText("CS209 Chatting Platform");
 
-        Optional<String> input = dialog.showAndWait();
-        if (input.isPresent() && !input.get().isEmpty()) {
-            /*
-               TODO: Check if there is a user with the same name among the currently logged-in users,
-                     if so, ask the user to change the username
-             */
-            username = input.get();
-            try {
-                doSendMessage();//"server","",MessageType.Register
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+// Set the button types.
+        ButtonType loginButtonType = new ButtonType("Login", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(loginButtonType, ButtonType.CANCEL);
+
+// Create the username and password labels and fields.
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+
+        TextField inputName = new TextField();
+        inputName.setPromptText("Username");
+
+        grid.add(new Label("Username:"), 0, 0);
+        grid.add(inputName, 1, 0);
+
+// Enable/Disable login button depending on whether a username was entered.
+        Button loginButton = (Button) dialog.getDialogPane().lookupButton(loginButtonType);
+        loginButton.setDisable(true);
+
+// Do some validation (using the Java 8 lambda syntax).
+        inputName.textProperty().addListener((observable, oldValue, newValue) -> {
+            loginButton.setDisable(newValue.trim().isEmpty());
+        });
+        dialog.getDialogPane().setContent(grid);
+
+// Request focus on the username field by default.
+        Platform.runLater(inputName::requestFocus);
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get().getButtonData().equals(ButtonBar.ButtonData.OK_DONE)) {// 单击了确定按钮OK_DONE
+            if (inputName.getText()!=null) {
+                username = inputName.getText();
+                Message reg = newMessage("",MessageType.Register);
+                try {
+                    output.writeObject(reg);
+                    while (socket.isConnected()) {
+                        Message inputMsg = (Message) input.readObject();
+                        if (inputMsg != null) {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Information Dialog");
+                            alert.setHeaderText(null);
+                            alert.setContentText(inputMsg.getData());
+                            alert.showAndWait();
+                            if (inputMsg.getData().equals("The user name already exists, please try again.")) {
+                                Platform.exit();
+                            } else {
+                                currentUsername.setText(username);
+                            }
+                            break;
+                        }
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
             }
-        } else {
-            System.out.println("Invalid username " + input + ", exiting");
+        } else { // 单击了取消按钮CANCEL_CLOSE
             Platform.exit();
         }
-
         chatContentList.setCellFactory(new MessageCellFactory());
     }
 
     @FXML
-    public void createPrivateChat() {
+    public void createPrivateChat() throws IOException, ClassNotFoundException {
         AtomicReference<String> user = new AtomicReference<>();
 
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
 
-        // FIXME: get the user list from server, the current user's name should be filtered out
-        userSel.getItems().addAll("Item 1", "Item 2", "Item 3");
+        output.writeObject(newMessage("",MessageType.GetUserList));
+
+        while (socket.isConnected()) {
+            Message inputMsg = (Message) input.readObject();
+            if (inputMsg != null && inputMsg.getType() == MessageType.GetUserList) {
+                String names = inputMsg.getData();
+                String[]userNames = names.substring(1,names.length()-1).split(", ");
+                for (String s:userNames) {
+                    if (!s.equals(username))
+                        userSel.getItems().add(s);
+                }
+                break;
+            }
+        }
 
         Button okBtn = new Button("OK");
         okBtn.setOnAction(e -> {
@@ -120,8 +179,11 @@ public class Controller implements Initializable {
      * Blank messages are not allowed.
      * After sending the message, you should clear the text input field.
      */
+    private Message newMessage(String data, MessageType type){
+        return new Message(System.currentTimeMillis(),this.username,"server",data,type);
+    }
     @FXML
-    public void doSendMessage() throws IOException {//String sendTo, String data, MessageType type
+    public void doSendMessage(){//String sendTo, String data, MessageType type
 //        Message msg = new Message(System.currentTimeMillis(),this.username,sendTo,data,type);
 //        output.writeObject(msg);
     }

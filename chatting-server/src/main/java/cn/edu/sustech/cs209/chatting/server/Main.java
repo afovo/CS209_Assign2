@@ -18,8 +18,6 @@ public class Main {
     public static void main(String[] args) throws IOException {
         System.out.println("-----Starting server-----");
         ServerSocket server = new ServerSocket(25250);
-        MessageType a = MessageType.Logout;
-        System.out.println(a);
         System.out.println("-----[Server] Waiting connection-----");
 
         while(true){
@@ -49,12 +47,6 @@ public class Main {
                 os = socket.getOutputStream();
                 output = new ObjectOutputStream(os);
 
-//                Message firstMessage = (Message) input.readObject();
-//                checkDuplicateUsername(firstMessage);
-//                writers.add(output);
-//                sendNotification(firstMessage);
-//                addToList();
-
                 while (socket.isConnected()) {
                     Message inputMsg = (Message) input.readObject();
                     if (inputMsg != null) {
@@ -64,6 +56,9 @@ public class Main {
                                 writers.add(output);
                                 break;
                             case Login:
+                                break;
+                            case GetUserList:
+                                output.writeObject(newMessage(userList.keySet().toString(),MessageType.GetUserList));
                                 break;
                             case Chat:
                                 break;
@@ -75,7 +70,11 @@ public class Main {
             } catch (SocketException socketException) {
                 System.err.println("Socket Exception for user " + user.getName());
             } catch (DuplicatedUserNameException exception) {
-                System.err.println(exception);
+                try {
+                    output.writeObject(newMessage("The user name already exists, please try again.",MessageType.Login));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             } catch (Exception e){
                 System.err.println("Exception in run() method for user: " + user.getName() + e);
             } finally {
@@ -142,20 +141,22 @@ public class Main {
          */
         private void addToList(Message inputMsg) throws IOException, DuplicatedUserNameException {
             String name = inputMsg.getSentBy();
+            user = new User(name);
             if (!userList.containsKey(name)) {
-                user = new User(name);
                 user.setStatus(UserStatus.ONLINE);
                 userList.put(name, user);
                 System.out.println("[Server]"+ name + " has been added to the list");
-                Message msg = new Message(System.currentTimeMillis(),"server",name,
-                        "[Server]"+ name + "has joined the chat", MessageType.Register);
-                write(msg);
+                Message msg = newMessage("[Server]"+ name + "has joined the chat", MessageType.Register);
+                output.writeObject(msg);
+                write(msg);//notify all
             } else {
-                System.err.println(name + " is already connected");
                 throw new DuplicatedUserNameException(name + " is already connected");
             }
         }
 
+        private Message newMessage(String data, MessageType type){
+            return new Message(System.currentTimeMillis(),"server",user.getName(),data,type);
+        }
         /*
          * Creates and sends a Message type to the listeners.
          */
