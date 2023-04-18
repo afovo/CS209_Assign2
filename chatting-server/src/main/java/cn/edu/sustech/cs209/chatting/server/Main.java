@@ -57,7 +57,7 @@ public class Main {
                             case Login:
                                 break;
                             case Chat:
-                                if (!receiver.equals(chatName)){//group chat
+                                if (inputMsg.isGroup){//group chat
                                     String[]receivers = receiver.split(",");
                                     for (String r:receivers) {
                                         writers.get(r).writeObject(inputMsg);

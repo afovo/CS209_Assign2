@@ -181,8 +181,15 @@ public class Controller implements Initializable {//main thread to server
     @FXML
     public void doSendChat() throws IOException {
         String data = inputArea.getText();
-        ClientController.sendMessage(newMessage(allChats.get(currentChatName).getClientViewUsers(),data,MessageType.Chat));
-        inputArea.clear();
+        if (!data.equals("")) {
+            Chat c = allChats.get(currentChatName);
+            Message message = newMessage(c.getClientViewUsers(),data,MessageType.Chat);
+            c.getMessages().add(message);
+            chatContentList.getItems().clear();
+            chatContentList.getItems().setAll(c.getMessages());
+            inputArea.clear();
+            ClientController.sendMessage(message);
+        }
     }
 
     private static class ClientController implements Runnable {
@@ -251,19 +258,25 @@ public class Controller implements Initializable {//main thread to server
                                 }
                                 Chat c = allChats.get(chatName);
                                 if (c == null) {//new chat
-                                    if (!message.isGroup){//group
+                                    if (message.isGroup){//group
                                         c = new Chat(chatName,receiver);
                                     } else {//private
                                         c = new Chat(chatName);
                                     }
                                     allChats.put(chatName, c);
-                                    chatList.getItems().add(chatName);
+                                    String finalChatName = chatName;
+                                    Platform.runLater(()->{
+                                        chatList.getItems().add(finalChatName);
+                                    });
                                 }
                                 if (!message.getData().equals("")){
                                     c.getMessages().add(message);
                                 }
-                                chatContentList.getItems().clear();
-                                chatContentList.getItems().setAll(c.getMessages());
+                                Chat finalC = c;
+                                Platform.runLater(()-> {
+                                    chatContentList.getItems().clear();
+                                    chatContentList.getItems().setAll(finalC.getMessages());
+                                });
                                 break;
                             case Logout:
                                 break;
@@ -352,6 +365,8 @@ public class Controller implements Initializable {//main thread to server
         @Override
         public void changed(ObservableValue<?> observable, Object oldValue, Object newValue) {
             currentChatName = (String) newValue;
+            chatContentList.getItems().clear();
+            chatContentList.getItems().setAll(allChats.get(currentChatName).getMessages());
             System.out.println(newValue);
         }
     }
