@@ -1,4 +1,5 @@
 cn\edu\sustech\cs209\chatting\common\Message.class
 cn\edu\sustech\cs209\chatting\common\MessageType.class
 cn\edu\sustech\cs209\chatting\common\UserStatus.class
+cn\edu\sustech\cs209\chatting\common\Chat.class
 cn\edu\sustech\cs209\chatting\common\User.class

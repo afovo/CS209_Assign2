@@ -6,6 +6,8 @@ import java.io.Serializable;
 public class Message implements Serializable {
     private Long timestamp;
 
+    private String groupName;
+
     private String sentBy;
 
     private String sendTo;
@@ -17,6 +19,7 @@ public class Message implements Serializable {
 
     public Message(Long timestamp, String sentBy, String sendTo, String data, MessageType type) {
         this.timestamp = timestamp;
+        this.groupName = null;
         this.sentBy = sentBy;
         this.sendTo = sendTo;
         this.data = data;
@@ -26,6 +29,8 @@ public class Message implements Serializable {
     public Long getTimestamp() {
         return timestamp;
     }
+
+    public String getGroupName() {return groupName;}
 
     public String getSentBy() {
         return sentBy;

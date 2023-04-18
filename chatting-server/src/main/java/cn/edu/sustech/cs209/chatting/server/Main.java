@@ -1,9 +1,6 @@
 package cn.edu.sustech.cs209.chatting.server;
 
-import cn.edu.sustech.cs209.chatting.common.Message;
-import cn.edu.sustech.cs209.chatting.common.MessageType;
-import cn.edu.sustech.cs209.chatting.common.User;
-import cn.edu.sustech.cs209.chatting.common.UserStatus;
+import cn.edu.sustech.cs209.chatting.common.*;
 import cn.edu.sustech.cs209.chatting.server.Exceptions.DuplicatedUserNameException;
 
 
@@ -13,6 +10,7 @@ import java.util.*;
 
 public class Main {
     public static HashMap<String,User> userList = new HashMap<>();
+    public static ArrayList<Chat> chatList = new ArrayList<>();
     private static HashSet<ObjectOutputStream> writers = new HashSet<>();
 
     public static void main(String[] args) throws IOException {
@@ -31,21 +29,18 @@ public class Main {
         private Socket socket;
         private User user;
         private ObjectInputStream input;
-        private InputStream is;
-        private OutputStream os;
         private ObjectOutputStream output;
 
         public ServerController(Socket socket) throws IOException {
             this.socket = socket;
         }
 
+        @Override
         public void run() {
             System.out.println("[Server]Attempting to connect a user...");
             try {
-                is = socket.getInputStream();
-                input = new ObjectInputStream(is);
-                os = socket.getOutputStream();
-                output = new ObjectOutputStream(os);
+                input = new ObjectInputStream(socket.getInputStream());
+                output = new ObjectOutputStream(socket.getOutputStream());
 
                 while (socket.isConnected()) {
                     Message inputMsg = (Message) input.readObject();
@@ -54,13 +49,12 @@ public class Main {
                             case Register:
                                 addToList(inputMsg);
                                 writers.add(output);
+                                notifyAll(newMessage(userList.keySet().toString(),MessageType.UpdateUserList));
                                 break;
                             case Login:
                                 break;
-                            case GetUserList:
-                                output.writeObject(newMessage(userList.keySet().toString(),MessageType.GetUserList));
-                                break;
                             case Chat:
+                                output.writeObject(inputMsg);
                                 break;
                             case Logout:
                                 break;
@@ -71,7 +65,7 @@ public class Main {
                 System.err.println("Socket Exception for user " + user.getName());
             } catch (DuplicatedUserNameException exception) {
                 try {
-                    output.writeObject(newMessage("The user name already exists, please try again.",MessageType.Login));
+                    output.writeObject(newMessage("The user name already exists, please try again.",MessageType.Register));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -145,10 +139,10 @@ public class Main {
             if (!userList.containsKey(name)) {
                 user.setStatus(UserStatus.ONLINE);
                 userList.put(name, user);
-                System.out.println("[Server]"+ name + " has been added to the list");
-                Message msg = newMessage("[Server]"+ name + "has joined the chat", MessageType.Register);
+                System.out.println("[Server] "+ name + " has been added to the list");
+                Message msg = newMessage("[Server] You ("+name+") have joined the chat!", MessageType.Register);
                 output.writeObject(msg);
-                write(msg);//notify all
+                output.flush();
             } else {
                 throw new DuplicatedUserNameException(name + " is already connected");
             }
@@ -160,7 +154,7 @@ public class Main {
         /*
          * Creates and sends a Message type to the listeners.
          */
-        private void write(Message msg) throws IOException {
+        private void notifyAll(Message msg) throws IOException {//notify All
             for (ObjectOutputStream writer : writers) {
                 writer.writeObject(msg);
                 writer.reset();

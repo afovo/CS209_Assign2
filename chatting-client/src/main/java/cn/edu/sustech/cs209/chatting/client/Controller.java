@@ -1,8 +1,12 @@
 package cn.edu.sustech.cs209.chatting.client;
 
+import cn.edu.sustech.cs209.chatting.common.Chat;
 import cn.edu.sustech.cs209.chatting.common.Message;
 import cn.edu.sustech.cs209.chatting.common.MessageType;
+import cn.edu.sustech.cs209.chatting.common.User;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -15,44 +19,70 @@ import javafx.stage.Stage;
 import javafx.util.Callback;
 
 import java.net.URL;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import java.net.*;
 import java.io.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
-public class Controller implements Initializable {
-
-    public ListView chatList;
+public class Controller implements Initializable {//main thread to server
+    @FXML
+    public TreeView<String> chatList;
+    static ArrayList<Chat> allChats;
+    @FXML
     public TextArea inputArea;
+    @FXML
     public Label currentUsername;
+    @FXML
     public Label currentOnlineCnt;
-    Socket socket;
-
     @FXML
     ListView<Message> chatContentList;
 
-    String username;
+    static String username;
+    static String[]userList;
 
-    private InputStream is;
-    private ObjectInputStream input;
-
-    private OutputStream os;
-    private ObjectOutputStream output;
+    ClientController clientController;//thread for message sending/receiving
+    public static Lock generateLock;
 
     @Override
-    public void initialize(URL url, ResourceBundle resourceBundle) {
+    public void initialize(URL url, ResourceBundle resourceBundle) {//JavaFX Application Thread
         try {
-            this.socket = new Socket("localhost",25250);
-            os = socket.getOutputStream();
-            output = new ObjectOutputStream(os);
-            is = socket.getInputStream();
-            input = new ObjectInputStream(is);
+            Socket socket = new Socket("localhost",25250);
+            clientController = new ClientController(socket,currentUsername,currentOnlineCnt);
+            new Thread(clientController).start();
+            loginFrameInitialize();
+            //ToDo: local history
+            chatList = new TreeView<>();
+            chatList.setOnMouseClicked(event -> {
+                TreeItem<String> selectedItem = chatList.getSelectionModel().getSelectedItem();
+                if (selectedItem != null) {
+                    // Find the chat that matches the selected item
+                    Chat selectedChat = allChats.stream()
+                            .filter(chat -> chat.getName().equals(selectedItem.getValue()))
+                            .findFirst()
+                            .orElse(null);
+                    if (selectedChat != null) {
+                        // Display the messages for the selected chat
+                        ObservableList<Message> messageList = FXCollections.observableArrayList(selectedChat.getMessages());
+                        chatContentList.setItems(messageList);
+                    }
+                }
+            });
+            chatContentList = new ListView<>();
+            chatContentList.setCellFactory(new MessageCellFactory());
+//            chatList.setCellFactory(new ChatCellFactory());
+            allChats = new ArrayList<>();
         } catch (IOException e) {
-            System.err.println("Cannot connect:(");
+            Platform.runLater(() -> {
+                generateAlert("Cannot connect to the Server :(");
+            });
+            throw new RuntimeException(e);
         }
+    }
+
+    private void loginFrameInitialize() {
 // Create the custom dialog.
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Login Dialog");
@@ -91,63 +121,39 @@ public class Controller implements Initializable {
         if (result.isPresent() && result.get().getButtonData().equals(ButtonBar.ButtonData.OK_DONE)) {// 单击了确定按钮OK_DONE
             if (inputName.getText()!=null) {
                 username = inputName.getText();
-                Message reg = newMessage("",MessageType.Register);
                 try {
-                    output.writeObject(reg);
-                    while (socket.isConnected()) {
-                        Message inputMsg = (Message) input.readObject();
-                        if (inputMsg != null) {
-                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                            alert.setTitle("Information Dialog");
-                            alert.setHeaderText(null);
-                            alert.setContentText(inputMsg.getData());
-                            alert.showAndWait();
-                            if (inputMsg.getData().equals("The user name already exists, please try again.")) {
-                                Platform.exit();
-                            } else {
-                                currentUsername.setText(username);
-                            }
-                            break;
-                        }
-                    }
-                } catch (IOException | ClassNotFoundException e) {
+                    ClientController.sendMessage(newMessage("",MessageType.Register));
+                } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             }
         } else { // 单击了取消按钮CANCEL_CLOSE
             Platform.exit();
         }
-        chatContentList.setCellFactory(new MessageCellFactory());
     }
 
+    private static void generateAlert(String info) {
+//        System.out.println("执行generateAlert的线程是：" + Thread.currentThread().getName());
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Information Dialog");
+        alert.setHeaderText(null);
+        alert.setContentText(info);
+        alert.showAndWait();
+    }
     @FXML
-    public void createPrivateChat() throws IOException, ClassNotFoundException {
+    public void createPrivateChat() throws IOException {
         AtomicReference<String> user = new AtomicReference<>();
 
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
-
-        output.writeObject(newMessage("",MessageType.GetUserList));
-
-        while (socket.isConnected()) {
-            Message inputMsg = (Message) input.readObject();
-            if (inputMsg != null && inputMsg.getType() == MessageType.GetUserList) {
-                String names = inputMsg.getData();
-                String[]userNames = names.substring(1,names.length()-1).split(", ");
-                for (String s:userNames) {
-                    if (!s.equals(username))
-                        userSel.getItems().add(s);
-                }
-                break;
-            }
+        for (String s:userList) {
+            userSel.getItems().add(s);
         }
-
         Button okBtn = new Button("OK");
         okBtn.setOnAction(e -> {
             user.set(userSel.getSelectionModel().getSelectedItem());
             stage.close();
         });
-
         HBox box = new HBox(10);
         box.setAlignment(Pos.CENTER);
         box.setPadding(new Insets(20, 20, 20, 20));
@@ -155,6 +161,31 @@ public class Controller implements Initializable {
         stage.setScene(new Scene(box));
         stage.showAndWait();
 
+        String name = user.get();
+        boolean flag = true;
+
+// Create root item
+        TreeItem<String> rootItem = new TreeItem<>("Chats");
+        chatList.setRoot(rootItem);
+
+// Add chat items to the tree
+        for (Chat chat : allChats) {
+            TreeItem<String> chatItem = new TreeItem<>(chat.getName());
+            rootItem.getChildren().add(chatItem);
+        }
+
+
+//        for (Chat c : allChats) {
+//            if (c.getName().equals(name)){//private chat
+//                flag = false;
+//                break;
+//            }
+//        }
+//        if (flag) {//new private chat
+//            allChats.add(new Chat(name, new String[]{name}));
+//            chatList.getItems().add(name);
+//            ClientController.sendMessage(newMessage("",MessageType.Chat));
+//        }
         // TODO: if the current user already chatted with the selected user, just open the chat with that user
         // TODO: otherwise, create a new chat item in the left panel, the title should be the selected user's name
     }
@@ -180,12 +211,96 @@ public class Controller implements Initializable {
      * After sending the message, you should clear the text input field.
      */
     private Message newMessage(String data, MessageType type){
-        return new Message(System.currentTimeMillis(),this.username,"server",data,type);
+        return new Message(System.currentTimeMillis(), username,"server",data,type);
     }
     @FXML
-    public void doSendMessage(){//String sendTo, String data, MessageType type
-//        Message msg = new Message(System.currentTimeMillis(),this.username,sendTo,data,type);
-//        output.writeObject(msg);
+    public void doSendChat(){
+
+    }
+
+    private static class ClientController implements Runnable {
+        Socket socket;
+        private static ObjectOutputStream output;
+        private static ObjectInputStream input;
+        private Label currentUsername;
+        private Label currentOnlineCnt;
+        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt) {
+            this.socket = socket;
+            this.currentUsername = currentUserName;
+            this.currentOnlineCnt = currentOnlineCnt;
+        }
+
+        public static void sendMessage(Message msg) throws IOException {
+//            System.out.println("执行sendMessage的线程是：" + Thread.currentThread().getName());
+            output.writeObject(msg);
+            output.flush();
+        }
+
+        @Override
+        public void run() {
+            try {
+                output = new ObjectOutputStream(socket.getOutputStream());
+                input = new ObjectInputStream(socket.getInputStream());
+                while (socket.isConnected()) {
+                    Message message;
+                    message = (Message) input.readObject();
+                    if (message != null) {
+//                        System.out.println("执行ClientController的线程是：" + Thread.currentThread().getName());
+                        System.out.println("Message received:" + message.getData() + " MessageType:" + message.getType());
+                        switch (message.getType()) {
+                            case Register:
+                                Platform.runLater(() -> {
+                                    generateAlert(message.getData());
+                                    if (message.getData().equals("The user name already exists, please try again.")) {
+                                        Platform.exit();
+                                    } else {
+                                        currentUsername.setText(username);
+                                    }
+                                });
+                                break;
+                            case Login:
+                                break;
+                            case UpdateUserList:
+                                Platform.runLater(() -> {
+                                    String names = message.getData();
+                                    userList = names.substring(1,names.length()-1).split(", ");
+                                    currentOnlineCnt.setText(String.valueOf(userList.length));
+                                });
+                                break;
+                            case Chat:
+                                boolean flag = true;//true, then new chat
+                                if (message.getGroupName() != null) {
+                                    for (Chat c : allChats) {
+                                        if (c.getName().equals(message.getGroupName())){//group chat
+                                            //ToDo
+                                            flag = false;
+                                            break;
+                                        }
+                                    }
+                                    if (flag) {//new group chat
+
+                                    }
+                                } else {
+                                    for (Chat c : allChats) {
+                                        if (c.getName().equals(message.getSentBy())){//private chat
+                                            flag = false;
+                                            break;
+                                        }
+                                    }
+                                    if (flag) {//new private chat
+
+                                    }
+                                }
+                                break;
+                            case Logout:
+                                break;
+                        }
+                    }
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     /**
@@ -201,6 +316,8 @@ public class Controller implements Initializable {
                 public void updateItem(Message msg, boolean empty) {
                     super.updateItem(msg, empty);
                     if (empty || Objects.isNull(msg)) {
+                        setText(null);
+                        setGraphic(null);
                         return;
                     }
 
@@ -228,4 +345,35 @@ public class Controller implements Initializable {
             };
         }
     }
+    private class ChatCellFactory implements Callback<ListView<String>, ListCell<String>> {
+        @Override
+        public ListCell<String> call(ListView<String> param) {
+            return new ListCell<String>() {
+                @Override
+                public void updateItem(String name, boolean empty) {
+                    super.updateItem(name, empty);
+                    if (empty || Objects.isNull(name)) {
+                        setText(null);
+                        setGraphic(null);
+                        return;
+                    }
+
+                    HBox wrapper = new HBox();
+                    Label nameLabel = new Label(name);
+
+                    nameLabel.setPrefSize(50, 20);
+                    nameLabel.setWrapText(true);
+                    nameLabel.setStyle("-fx-border-color: black; -fx-border-width: 1px;");
+
+                    wrapper.setAlignment(Pos.TOP_LEFT);
+                    wrapper.getChildren().addAll(nameLabel);
+                    nameLabel.setPadding(new Insets(0, 20, 0, 0));
+
+                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                    setGraphic(wrapper);
+                }
+            };
+        }
+    }
+
 }

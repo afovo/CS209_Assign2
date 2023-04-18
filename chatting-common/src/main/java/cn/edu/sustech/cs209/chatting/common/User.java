@@ -2,10 +2,10 @@ package cn.edu.sustech.cs209.chatting.common;
 
 import java.io.Serializable;
 
-/**
- * Created by Dominic on 01-May-16.
- */
 public class User implements Serializable {
+    String name;
+    String picture;
+    UserStatus status;
     public User(String name){
         this.name=name;
     }
@@ -16,8 +16,6 @@ public class User implements Serializable {
     public void setName(String name) {
         this.name = name;
     }
-
-    String name;
 
     public String getPicture() {
         return picture;
@@ -35,6 +33,4 @@ public class User implements Serializable {
         this.status = status;
     }
 
-    String picture;
-    UserStatus status;
 }
