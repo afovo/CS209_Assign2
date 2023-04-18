@@ -11,7 +11,7 @@ import java.util.*;
 public class Main {
     public static HashMap<String,User> userList = new HashMap<>();
     public static ArrayList<Chat> chatList = new ArrayList<>();
-    private static HashSet<ObjectOutputStream> writers = new HashSet<>();
+    private static HashMap<String, ObjectOutputStream> writers = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         System.out.println("-----Starting server-----");
@@ -45,16 +45,26 @@ public class Main {
                 while (socket.isConnected()) {
                     Message inputMsg = (Message) input.readObject();
                     if (inputMsg != null) {
+                        String sender = inputMsg.getSentBy();
+                        String receiver = inputMsg.getSendTo();
+                        String chatName = inputMsg.chatName;
                         switch (inputMsg.getType()) {
                             case Register:
                                 addToList(inputMsg);
-                                writers.add(output);
+                                writers.put(sender,output);
                                 notifyAll(newMessage(userList.keySet().toString(),MessageType.UpdateUserList));
                                 break;
                             case Login:
                                 break;
                             case Chat:
-                                output.writeObject(inputMsg);
+                                if (!receiver.equals(chatName)){//group chat
+                                    String[]receivers = receiver.split(",");
+                                    for (String r:receivers) {
+                                        writers.get(r).writeObject(inputMsg);
+                                    }
+                                } else {
+                                    writers.get(receiver).writeObject(inputMsg);
+                                }
                                 break;
                             case Logout:
                                 break;
@@ -155,7 +165,7 @@ public class Main {
          * Creates and sends a Message type to the listeners.
          */
         private void notifyAll(Message msg) throws IOException {//notify All
-            for (ObjectOutputStream writer : writers) {
+            for (ObjectOutputStream writer : writers.values()) {
                 writer.writeObject(msg);
                 writer.reset();
             }

@@ -3,8 +3,9 @@ package cn.edu.sustech.cs209.chatting.client;
 import cn.edu.sustech.cs209.chatting.common.Chat;
 import cn.edu.sustech.cs209.chatting.common.Message;
 import cn.edu.sustech.cs209.chatting.common.MessageType;
-import cn.edu.sustech.cs209.chatting.common.User;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -24,56 +25,41 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import java.net.*;
 import java.io.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class Controller implements Initializable {//main thread to server
+    static HashMap<String, Chat> allChats;
+    static String currentChatName;
     @FXML
-    public TreeView<String> chatList;
-    static ArrayList<Chat> allChats;
+    public ListView<String> chatList;
+    @FXML
+    ListView<Message> chatContentList;
+
     @FXML
     public TextArea inputArea;
+    @FXML
+    public Button send;
     @FXML
     public Label currentUsername;
     @FXML
     public Label currentOnlineCnt;
-    @FXML
-    ListView<Message> chatContentList;
 
     static String username;
     static String[]userList;
 
-    ClientController clientController;//thread for message sending/receiving
-    public static Lock generateLock;
+    ClientController clientController;//Thread for message sending/receiving
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {//JavaFX Application Thread
         try {
             Socket socket = new Socket("localhost",25250);
-            clientController = new ClientController(socket,currentUsername,currentOnlineCnt);
+            clientController = new ClientController(socket,currentUsername,currentOnlineCnt,chatList,chatContentList);
             new Thread(clientController).start();
             loginFrameInitialize();
             //ToDo: local history
-            chatList = new TreeView<>();
-            chatList.setOnMouseClicked(event -> {
-                TreeItem<String> selectedItem = chatList.getSelectionModel().getSelectedItem();
-                if (selectedItem != null) {
-                    // Find the chat that matches the selected item
-                    Chat selectedChat = allChats.stream()
-                            .filter(chat -> chat.getName().equals(selectedItem.getValue()))
-                            .findFirst()
-                            .orElse(null);
-                    if (selectedChat != null) {
-                        // Display the messages for the selected chat
-                        ObservableList<Message> messageList = FXCollections.observableArrayList(selectedChat.getMessages());
-                        chatContentList.setItems(messageList);
-                    }
-                }
-            });
-            chatContentList = new ListView<>();
+            ListSelectListener chatListener = new ListSelectListener();
+            chatList.getSelectionModel().selectedItemProperty().addListener(chatListener);
             chatContentList.setCellFactory(new MessageCellFactory());
-//            chatList.setCellFactory(new ChatCellFactory());
-            allChats = new ArrayList<>();
+            allChats = new HashMap<>();
         } catch (IOException e) {
             Platform.runLater(() -> {
                 generateAlert("Cannot connect to the Server :(");
@@ -122,7 +108,7 @@ public class Controller implements Initializable {//main thread to server
             if (inputName.getText()!=null) {
                 username = inputName.getText();
                 try {
-                    ClientController.sendMessage(newMessage("",MessageType.Register));
+                    ClientController.sendMessage(newMessage("","",MessageType.Register));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -133,7 +119,6 @@ public class Controller implements Initializable {//main thread to server
     }
 
     private static void generateAlert(String info) {
-//        System.out.println("执行generateAlert的线程是：" + Thread.currentThread().getName());
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Information Dialog");
         alert.setHeaderText(null);
@@ -162,60 +147,42 @@ public class Controller implements Initializable {//main thread to server
         stage.showAndWait();
 
         String name = user.get();
-        boolean flag = true;
-
-// Create root item
-        TreeItem<String> rootItem = new TreeItem<>("Chats");
-        chatList.setRoot(rootItem);
-
-// Add chat items to the tree
-        for (Chat chat : allChats) {
-            TreeItem<String> chatItem = new TreeItem<>(chat.getName());
-            rootItem.getChildren().add(chatItem);
+        currentChatName = name;
+        privateChatHandler(name);
+    }
+    public void privateChatHandler(String name) throws IOException {
+        Chat c = allChats.get(name);
+        if (c != null) {
+            chatContentList.getItems().clear();
+            chatContentList.getItems().setAll(c.getMessages());
+        } else {//new private chat
+            allChats.put(name, new Chat(name));
+            chatList.getItems().add(name);
+            ClientController.sendMessage(newMessage(name,"",MessageType.Chat));
         }
-
-
-//        for (Chat c : allChats) {
-//            if (c.getName().equals(name)){//private chat
-//                flag = false;
-//                break;
-//            }
-//        }
-//        if (flag) {//new private chat
-//            allChats.add(new Chat(name, new String[]{name}));
-//            chatList.getItems().add(name);
-//            ClientController.sendMessage(newMessage("",MessageType.Chat));
-//        }
-        // TODO: if the current user already chatted with the selected user, just open the chat with that user
-        // TODO: otherwise, create a new chat item in the left panel, the title should be the selected user's name
     }
 
-    /**
-     * A new dialog should contain a multi-select list, showing all user's name.
-     * You can select several users that will be joined in the group chat, including yourself.
-     * <p>
-     * The naming rule for group chats is similar to WeChat:
-     * If there are > 3 users: display the first three usernames, sorted in lexicographic order, then use ellipsis with the number of users, for example:
-     * UserA, UserB, UserC... (10)
-     * If there are <= 3 users: do not display the ellipsis, for example:
-     * UserA, UserB (2)
-     */
     @FXML
     public void createGroupChat() {
+        /*
+         * A new dialog should contain a multi-select list, showing all user's name.
+         * You can select several users that will be joined in the group chat, including yourself.
+         * <p>
+         * The naming rule for group chats is similar to WeChat:
+         * If there are > 3 users: display the first three usernames, sorted in lexicographic order, then use ellipsis with the number of users, for example:
+         * UserA, UserB, UserC... (10)
+         * If there are <= 3 users: do not display the ellipsis, for example:
+         * UserA, UserB (2)
+         */
     }
-
-    /**
-     * Sends the message to the <b>currently selected</b> chat.
-     * <p>
-     * Blank messages are not allowed.
-     * After sending the message, you should clear the text input field.
-     */
-    private Message newMessage(String data, MessageType type){
-        return new Message(System.currentTimeMillis(), username,"server",data,type);
+    private static Message newMessage(String sendTo, String data, MessageType type){
+        return new Message(System.currentTimeMillis(), username, sendTo, data, type);
     }
     @FXML
-    public void doSendChat(){
-
+    public void doSendChat() throws IOException {
+        String data = inputArea.getText();
+        ClientController.sendMessage(newMessage(allChats.get(currentChatName).getClientViewUsers(),data,MessageType.Chat));
+        inputArea.clear();
     }
 
     private static class ClientController implements Runnable {
@@ -224,14 +191,19 @@ public class Controller implements Initializable {//main thread to server
         private static ObjectInputStream input;
         private Label currentUsername;
         private Label currentOnlineCnt;
-        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt) {
+        private ListView<String> chatList;
+        private ListView<Message> chatContentList;
+
+        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt, ListView<String>chatList,
+                                ListView<Message>chatContentList) {
             this.socket = socket;
             this.currentUsername = currentUserName;
             this.currentOnlineCnt = currentOnlineCnt;
+            this.chatList = chatList;
+            this.chatContentList = chatContentList;
         }
 
         public static void sendMessage(Message msg) throws IOException {
-//            System.out.println("执行sendMessage的线程是：" + Thread.currentThread().getName());
             output.writeObject(msg);
             output.flush();
         }
@@ -245,14 +217,17 @@ public class Controller implements Initializable {//main thread to server
                     Message message;
                     message = (Message) input.readObject();
                     if (message != null) {
-//                        System.out.println("执行ClientController的线程是：" + Thread.currentThread().getName());
                         System.out.println("Message received:" + message.getData() + " MessageType:" + message.getType());
+                        String sender = message.getSentBy();
+                        String receiver = message.getSendTo();
+                        String chatName = message.chatName;
                         switch (message.getType()) {
                             case Register:
                                 Platform.runLater(() -> {
                                     generateAlert(message.getData());
                                     if (message.getData().equals("The user name already exists, please try again.")) {
                                         Platform.exit();
+                                        System.exit(-1);
                                     } else {
                                         currentUsername.setText(username);
                                     }
@@ -268,29 +243,27 @@ public class Controller implements Initializable {//main thread to server
                                 });
                                 break;
                             case Chat:
-                                boolean flag = true;//true, then new chat
-                                if (message.getGroupName() != null) {
-                                    for (Chat c : allChats) {
-                                        if (c.getName().equals(message.getGroupName())){//group chat
-                                            //ToDo
-                                            flag = false;
-                                            break;
-                                        }
-                                    }
-                                    if (flag) {//new group chat
-
-                                    }
-                                } else {
-                                    for (Chat c : allChats) {
-                                        if (c.getName().equals(message.getSentBy())){//private chat
-                                            flag = false;
-                                            break;
-                                        }
-                                    }
-                                    if (flag) {//new private chat
-
-                                    }
+                                if (!message.isGroup) {
+                                    chatName = sender;
                                 }
+                                if (currentChatName == null) {
+                                    currentChatName = chatName;
+                                }
+                                Chat c = allChats.get(chatName);
+                                if (c == null) {//new chat
+                                    if (!message.isGroup){//group
+                                        c = new Chat(chatName,receiver);
+                                    } else {//private
+                                        c = new Chat(chatName);
+                                    }
+                                    allChats.put(chatName, c);
+                                    chatList.getItems().add(chatName);
+                                }
+                                if (!message.getData().equals("")){
+                                    c.getMessages().add(message);
+                                }
+                                chatContentList.getItems().clear();
+                                chatContentList.getItems().setAll(c.getMessages());
                                 break;
                             case Logout:
                                 break;
@@ -375,5 +348,11 @@ public class Controller implements Initializable {//main thread to server
             };
         }
     }
-
+    private class ListSelectListener implements ChangeListener<Object> {
+        @Override
+        public void changed(ObservableValue<?> observable, Object oldValue, Object newValue) {
+            currentChatName = (String) newValue;
+            System.out.println(newValue);
+        }
+    }
 }
