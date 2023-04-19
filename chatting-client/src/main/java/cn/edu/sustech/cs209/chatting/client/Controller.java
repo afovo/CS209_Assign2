@@ -3,11 +3,13 @@ package cn.edu.sustech.cs209.chatting.client;
 import cn.edu.sustech.cs209.chatting.common.Chat;
 import cn.edu.sustech.cs209.chatting.common.Message;
 import cn.edu.sustech.cs209.chatting.common.MessageType;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -19,14 +21,9 @@ import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
-import java.net.URL;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
-import java.net.*;
-import java.io.*;
 
-public class Controller implements Initializable {//main thread to server
+public class Controller implements Initializable {
     static HashMap<String, Chat> allChats;
     static String currentChatName;
     @FXML
@@ -46,13 +43,13 @@ public class Controller implements Initializable {//main thread to server
     static String username;
     static String[]userList;
 
-    ClientController clientController;//Thread for message sending/receiving
+    ClientController clientController; //Thread for message sending/receiving
 
     @Override
-    public void initialize(URL url, ResourceBundle resourceBundle) {//JavaFX Application Thread
+    public void initialize(URL url, ResourceBundle resourceBundle) { //JavaFX Application Thread
         try {
-            Socket socket = new Socket("localhost",25250);
-            clientController = new ClientController(socket,currentUsername,currentOnlineCnt,chatList,chatContentList);
+            Socket socket = new Socket("localhost", 25250);
+            clientController = new ClientController(socket, currentUsername, currentOnlineCnt, chatList, chatContentList);
             new Thread(clientController).start();
             loginFrameInitialize();
             //ToDo: local history
@@ -69,16 +66,16 @@ public class Controller implements Initializable {//main thread to server
     }
 
     private void loginFrameInitialize() {
-// Create the custom dialog.
+        // Create the custom dialog.
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Login Dialog");
         dialog.setHeaderText("CS209 Chatting Platform");
 
-// Set the button types.
+        // Set the button types.
         ButtonType loginButtonType = new ButtonType("Login", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(loginButtonType, ButtonType.CANCEL);
 
-// Create the username and password labels and fields.
+        // Create the username and password labels and fields.
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
@@ -90,25 +87,25 @@ public class Controller implements Initializable {//main thread to server
         grid.add(new Label("Username:"), 0, 0);
         grid.add(inputName, 1, 0);
 
-// Enable/Disable login button depending on whether a username was entered.
+        // Enable/Disable login button depending on whether a username was entered.
         Button loginButton = (Button) dialog.getDialogPane().lookupButton(loginButtonType);
         loginButton.setDisable(true);
 
-// Do some validation (using the Java 8 lambda syntax).
+        // Do some validation (using the Java 8 lambda syntax).
         inputName.textProperty().addListener((observable, oldValue, newValue) -> {
             loginButton.setDisable(newValue.trim().isEmpty());
         });
         dialog.getDialogPane().setContent(grid);
 
-// Request focus on the username field by default.
+        // Request focus on the username field by default.
         Platform.runLater(inputName::requestFocus);
 
         Optional<ButtonType> result = dialog.showAndWait();
-        if (result.isPresent() && result.get().getButtonData().equals(ButtonBar.ButtonData.OK_DONE)) {// 单击了确定按钮OK_DONE
-            if (inputName.getText()!=null) {
+        if (result.isPresent() && result.get().getButtonData().equals(ButtonBar.ButtonData.OK_DONE)) { // 单击了确定按钮OK_DONE
+            if (inputName.getText() != null) {
                 username = inputName.getText();
                 try {
-                    ClientController.sendMessage(newMessage("","",MessageType.Register));
+                    ClientController.sendMessage(newMessage("", "", MessageType.Register));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -131,7 +128,7 @@ public class Controller implements Initializable {//main thread to server
 
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
-        for (String s:userList) {
+        for (String s : userList) {
             userSel.getItems().add(s);
         }
         Button okBtn = new Button("OK");
@@ -155,10 +152,10 @@ public class Controller implements Initializable {//main thread to server
         if (c != null) {
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
-        } else {//new private chat
+        } else { //new private chat
             allChats.put(name, new Chat(name));
             chatList.getItems().add(name);
-            ClientController.sendMessage(newMessage(name,"",MessageType.Chat));
+            ClientController.sendMessage(newMessage(name, "", MessageType.Chat));
         }
     }
 
@@ -175,7 +172,7 @@ public class Controller implements Initializable {//main thread to server
          * UserA, UserB (2)
          */
     }
-    private static Message newMessage(String sendTo, String data, MessageType type){
+    private static Message newMessage(String sendTo, String data, MessageType type) {
         return new Message(System.currentTimeMillis(), username, sendTo, data, type);
     }
     @FXML
@@ -183,7 +180,7 @@ public class Controller implements Initializable {//main thread to server
         String data = inputArea.getText();
         if (!data.equals("")) {
             Chat c = allChats.get(currentChatName);
-            Message message = newMessage(c.getClientViewUsers(),data,MessageType.Chat);
+            Message message = newMessage(c.getClientViewUsers(), data, MessageType.Chat);
             c.getMessages().add(message);
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
@@ -245,7 +242,7 @@ public class Controller implements Initializable {//main thread to server
                             case UpdateUserList:
                                 Platform.runLater(() -> {
                                     String names = message.getData();
-                                    userList = names.substring(1,names.length()-1).split(", ");
+                                    userList = names.substring(1, names.length() - 1).split(", ");
                                     currentOnlineCnt.setText(String.valueOf(userList.length));
                                 });
                                 break;
@@ -257,28 +254,30 @@ public class Controller implements Initializable {//main thread to server
                                     currentChatName = chatName;
                                 }
                                 Chat c = allChats.get(chatName);
-                                if (c == null) {//new chat
-                                    if (message.isGroup){//group
+                                if (c == null) { //new chat
+                                    if (message.isGroup){ //group
                                         c = new Chat(chatName,receiver);
-                                    } else {//private
+                                    } else { //private
                                         c = new Chat(chatName);
                                     }
                                     allChats.put(chatName, c);
                                     String finalChatName = chatName;
-                                    Platform.runLater(()->{
+                                    Platform.runLater(() -> {
                                         chatList.getItems().add(finalChatName);
                                     });
                                 }
-                                if (!message.getData().equals("")){
+                                if (!message.getData().equals("")) {
                                     c.getMessages().add(message);
                                 }
                                 Chat finalC = c;
-                                Platform.runLater(()-> {
+                                Platform.runLater(() -> {
                                     chatContentList.getItems().clear();
                                     chatContentList.getItems().setAll(finalC.getMessages());
                                 });
                                 break;
                             case Logout:
+                                break;
+                            default:
                                 break;
                         }
                     }
@@ -289,10 +288,6 @@ public class Controller implements Initializable {//main thread to server
         }
     }
 
-    /**
-     * You may change the cell factory if you changed the design of {@code Message} model.
-     * Hint: you may also define a cell factory for the chats displayed in the left panel, or simply override the toString method.
-     */
     private class MessageCellFactory implements Callback<ListView<Message>, ListCell<Message>> {
         @Override
         public ListCell<Message> call(ListView<Message> param) {
@@ -324,36 +319,6 @@ public class Controller implements Initializable {//main thread to server
                         wrapper.getChildren().addAll(nameLabel, msgLabel);
                         msgLabel.setPadding(new Insets(0, 0, 0, 20));
                     }
-
-                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                    setGraphic(wrapper);
-                }
-            };
-        }
-    }
-    private class ChatCellFactory implements Callback<ListView<String>, ListCell<String>> {
-        @Override
-        public ListCell<String> call(ListView<String> param) {
-            return new ListCell<String>() {
-                @Override
-                public void updateItem(String name, boolean empty) {
-                    super.updateItem(name, empty);
-                    if (empty || Objects.isNull(name)) {
-                        setText(null);
-                        setGraphic(null);
-                        return;
-                    }
-
-                    HBox wrapper = new HBox();
-                    Label nameLabel = new Label(name);
-
-                    nameLabel.setPrefSize(50, 20);
-                    nameLabel.setWrapText(true);
-                    nameLabel.setStyle("-fx-border-color: black; -fx-border-width: 1px;");
-
-                    wrapper.setAlignment(Pos.TOP_LEFT);
-                    wrapper.getChildren().addAll(nameLabel);
-                    nameLabel.setPadding(new Insets(0, 20, 0, 0));
 
                     setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
                     setGraphic(wrapper);

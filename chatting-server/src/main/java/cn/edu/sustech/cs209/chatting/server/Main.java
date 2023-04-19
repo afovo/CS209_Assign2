@@ -63,7 +63,11 @@ public class Main {
                                         writers.get(r).writeObject(inputMsg);
                                     }
                                 } else {
-                                    writers.get(receiver).writeObject(inputMsg);
+                                    if (sender.equals(receiver)) {
+
+                                    } else {
+                                        writers.get(receiver).writeObject(inputMsg);
+                                    }
                                 }
                                 break;
                             case Logout:
@@ -98,36 +102,7 @@ public class Main {
 //            return msg;
 //        }
 //
-//        private synchronized void checkDuplicateUsername(Message firstMessage) throws DuplicatedUserNameException {
-//            logger.info(firstMessage.getName() + " is trying to connect");
-//            if (!names.containsKey(firstMessage.getName())) {
-//                this.name = firstMessage.getName();
-//                user = new User();
-//                user.setName(firstMessage.getName());
-//                user.setStatus(Status.ONLINE);
-//                user.setPicture(firstMessage.getPicture());
-//
-//                users.add(user);
-//                names.put(name, user);
-//
-//                logger.info(name + " has been added to the list");
-//            } else {
-//                logger.error(firstMessage.getName() + " is already connected");
-//                throw new DuplicateUsernameException(firstMessage.getName() + " is already connected");
-//            }
-//        }
-//
-//        private Message sendNotification(Message firstMessage) throws IOException {
-//            Message msg = new Message();
-//            msg.setMsg("has joined the chat.");
-//            msg.setType(MessageType.NOTIFICATION);
-//            msg.setName(firstMessage.getName());
-//            msg.setPicture(firstMessage.getPicture());
-//            write(msg);
-//            return msg;
-//        }
-//
-//
+
 //        private Message removeFromList() throws IOException {
 //            logger.debug("removeFromList() method Enter");
 //            Message msg = new Message();
@@ -140,9 +115,6 @@ public class Main {
 //            return msg;
 //        }
 
-        /*
-         * For displaying that a user has joined the server
-         */
         private void addToList(Message inputMsg) throws IOException, DuplicatedUserNameException {
             String name = inputMsg.getSentBy();
             user = new User(name);
@@ -161,9 +133,7 @@ public class Main {
         private Message newMessage(String data, MessageType type){
             return new Message(System.currentTimeMillis(),"server",user.getName(),data,type);
         }
-        /*
-         * Creates and sends a Message type to the listeners.
-         */
+
         private void notifyAll(Message msg) throws IOException {//notify All
             for (ObjectOutputStream writer : writers.values()) {
                 writer.writeObject(msg);
