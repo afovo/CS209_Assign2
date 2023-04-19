@@ -1,6 +1,7 @@
 package cn.edu.sustech.cs209.chatting.client;
 
 import cn.edu.sustech.cs209.chatting.common.Chat;
+import cn.edu.sustech.cs209.chatting.common.Emoji;
 import cn.edu.sustech.cs209.chatting.common.Message;
 import cn.edu.sustech.cs209.chatting.common.MessageType;
 import java.io.*;
@@ -33,6 +34,8 @@ public class Controller implements Initializable {
 
     @FXML
     public TextArea inputArea;
+    @FXML
+    public Button emoji;
     @FXML
     public Button send;
     @FXML
@@ -177,8 +180,36 @@ public class Controller implements Initializable {
     private static Message newMessage(String sendTo, String data, MessageType type) {
         return new Message(System.currentTimeMillis(), username, sendTo, data, type);
     }
+
+    @FXML
+    public void showEmojiList() {
+        AtomicReference<String> emoji = new AtomicReference<>();
+        Stage stage = new Stage();
+        ComboBox<String> emojiSel = new ComboBox<>();
+        for (String s : Emoji.emoji) {
+            emojiSel.getItems().add(s);
+        }
+        Button okBtn = new Button("OK");
+        okBtn.setOnAction(e -> {
+            emoji.set(emojiSel.getSelectionModel().getSelectedItem());
+            stage.close();
+        });
+        HBox box = new HBox(10);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(20, 20, 20, 20));
+        box.getChildren().addAll(emojiSel, okBtn);
+        stage.setScene(new Scene(box));
+        stage.showAndWait();
+        if (emoji.get() != null) {
+            inputArea.setText(inputArea.getText()+emoji.get());
+        }
+    }
     @FXML
     public void doSendChat() throws IOException {
+        if (currentChatName == null) {
+            generateAlert("Please select or create a chat!");
+            return;
+        }
         String data = inputArea.getText();
         if (!data.equals("")) {
             Chat c = allChats.get(currentChatName);
@@ -274,14 +305,14 @@ public class Controller implements Initializable {
                                     });
                                 }
 
-                                if (currentChatName == null) { // if no current chat, update the chatContent
-                                    currentChatName = chatName;
-                                    Chat finalC = c;
-                                    Platform.runLater(() -> {
-                                        chatContentList.getItems().clear();
-                                        chatContentList.getItems().setAll(finalC.getMessages());
-                                    });
-                                }
+//                                if (currentChatName == null) { // if no current chat, update the chatContent
+//                                    currentChatName = chatName;
+//                                    Chat finalC = c;
+//                                    Platform.runLater(() -> {
+//                                        chatContentList.getItems().clear();
+//                                        chatContentList.getItems().setAll(finalC.getMessages());
+//                                    });
+//                                }
                                 break;
                             case Logout:
                                 break;
