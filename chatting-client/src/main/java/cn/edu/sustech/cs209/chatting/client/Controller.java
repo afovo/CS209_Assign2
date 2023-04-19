@@ -145,7 +145,9 @@ public class Controller implements Initializable {
 
         String name = user.get();
         currentChatName = name;
-        privateChatHandler(name);
+        if (name != null) {
+            privateChatHandler(name);
+        }
     }
     public void privateChatHandler(String name) throws IOException {
         Chat c = allChats.get(name);
@@ -186,6 +188,8 @@ public class Controller implements Initializable {
             chatContentList.getItems().setAll(c.getMessages());
             inputArea.clear();
             ClientController.sendMessage(message);
+        } else {
+            generateAlert("Please input something!");
         }
     }
 
@@ -240,20 +244,18 @@ public class Controller implements Initializable {
                             case Login:
                                 break;
                             case UpdateUserList:
+                                String names = message.getData();
+                                userList = names.substring(1, names.length() - 1).split(", ");
                                 Platform.runLater(() -> {
-                                    String names = message.getData();
-                                    userList = names.substring(1, names.length() - 1).split(", ");
-                                    currentOnlineCnt.setText(String.valueOf(userList.length));
+                                    currentOnlineCnt.setText("Online: " + userList.length);
                                 });
                                 break;
                             case Chat:
                                 if (!message.isGroup) {
                                     chatName = sender;
                                 }
-                                if (currentChatName == null) {
-                                    currentChatName = chatName;
-                                }
                                 Chat c = allChats.get(chatName);
+                                String finalChatName = chatName;
                                 if (c == null) { //new chat
                                     if (message.isGroup){ //group
                                         c = new Chat(chatName,receiver);
@@ -261,19 +263,25 @@ public class Controller implements Initializable {
                                         c = new Chat(chatName);
                                     }
                                     allChats.put(chatName, c);
-                                    String finalChatName = chatName;
                                     Platform.runLater(() -> {
+                                        generateAlert("[New Chat] " + finalChatName);
                                         chatList.getItems().add(finalChatName);
                                     });
-                                }
-                                if (!message.getData().equals("")) {
+                                } else { //existing chat
                                     c.getMessages().add(message);
+                                    Platform.runLater(() -> {
+                                        generateAlert("[New Message] " + finalChatName);
+                                    });
                                 }
-                                Chat finalC = c;
-                                Platform.runLater(() -> {
-                                    chatContentList.getItems().clear();
-                                    chatContentList.getItems().setAll(finalC.getMessages());
-                                });
+
+                                if (currentChatName == null) { // if no current chat, update the chatContent
+                                    currentChatName = chatName;
+                                    Chat finalC = c;
+                                    Platform.runLater(() -> {
+                                        chatContentList.getItems().clear();
+                                        chatContentList.getItems().setAll(finalC.getMessages());
+                                    });
+                                }
                                 break;
                             case Logout:
                                 break;
@@ -283,7 +291,10 @@ public class Controller implements Initializable {
                     }
                 }
             } catch (IOException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
+                Platform.runLater(() -> {
+                    generateAlert("The server has been shut down :(");
+                    Platform.exit();
+                });
             }
         }
     }

@@ -25,7 +25,7 @@ public class Main {
         }
     }
 
-    private static class ServerController extends Thread {
+    private static class ServerController extends Thread { // one client thread
         private Socket socket;
         private User user;
         private ObjectInputStream input;
@@ -64,9 +64,11 @@ public class Main {
                                     }
                                 } else {
                                     if (sender.equals(receiver)) {
-
+                                        //do nothing
                                     } else {
-                                        writers.get(receiver).writeObject(inputMsg);
+                                        if (writers.get(receiver) != null) { // if still online
+                                            writers.get(receiver).writeObject(inputMsg);
+                                        }
                                     }
                                 }
                                 break;
@@ -76,7 +78,8 @@ public class Main {
                     }
                 }
             } catch (SocketException socketException) {
-                System.err.println("Socket Exception for user " + user.getName());
+//                System.err.println("Socket Exception for user " + user.getName());
+                closeConnection();
             } catch (DuplicatedUserNameException exception) {
                 try {
                     output.writeObject(newMessage("The user name already exists, please try again.",MessageType.Register));
@@ -85,8 +88,6 @@ public class Main {
                 }
             } catch (Exception e){
                 System.err.println("Exception in run() method for user: " + user.getName() + e);
-            } finally {
-//                closeConnections();
             }
         }
 
@@ -103,18 +104,6 @@ public class Main {
 //        }
 //
 
-//        private Message removeFromList() throws IOException {
-//            logger.debug("removeFromList() method Enter");
-//            Message msg = new Message();
-//            msg.setMsg("has left the chat.");
-//            msg.setType(MessageType.DISCONNECTED);
-//            msg.setName("SERVER");
-//            msg.setUserlist(names);
-//            write(msg);
-//            logger.debug("removeFromList() method Exit");
-//            return msg;
-//        }
-
         private void addToList(Message inputMsg) throws IOException, DuplicatedUserNameException {
             String name = inputMsg.getSentBy();
             user = new User(name);
@@ -127,6 +116,14 @@ public class Main {
                 output.flush();
             } else {
                 throw new DuplicatedUserNameException(name + " is already connected");
+            }
+        }
+
+        private void removeFromList() throws IOException{
+            if (userList != null) {
+                userList.remove(user.getName());
+                System.out.println("User: " + user.getName() + " has been removed!");
+                notifyAll(newMessage(userList.keySet().toString(), MessageType.UpdateUserList));
             }
         }
 
@@ -144,49 +141,27 @@ public class Main {
         /*
          * Once a user has been disconnected, we close the open connections and remove the writers
          */
-//        private synchronized void closeConnections()  {
-//            logger.debug("closeConnections() method Enter");
-//            logger.info("HashMap names:" + names.size() + " writers:" + writers.size() + " usersList size:" + users.size());
-//            if (name != null) {
-//                names.remove(name);
-//                logger.info("User: " + name + " has been removed!");
-//            }
-//            if (user != null){
-//                users.remove(user);
-//                logger.info("User object: " + user + " has been removed!");
-//            }
-//            if (output != null){
-//                writers.remove(output);
-//                logger.info("Writer object: " + user + " has been removed!");
-//            }
-//            if (is != null){
-//                try {
-//                    is.close();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//            if (os != null){
-//                try {
-//                    os.close();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//            if (input != null){
-//                try {
-//                    input.close();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//            try {
-//                removeFromList();
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//            logger.info("HashMap names:" + names.size() + " writers:" + writers.size() + " usersList size:" + users.size());
-//            logger.debug("closeConnections() method Exit");
-//        }
+        private synchronized void closeConnection(){
+            if (output != null){
+                writers.remove(user.getName());
+                try {
+                    output.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (input != null){
+                try {
+                    input.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                removeFromList();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }
