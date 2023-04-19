@@ -8,6 +8,8 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -19,9 +21,9 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-
 
 
 public class Controller implements Initializable {
@@ -45,11 +47,10 @@ public class Controller implements Initializable {
 
     static String username;
     static String[]userList;
-
     ClientController clientController; //Thread for message sending/receiving
 
     @Override
-    public void initialize(URL url, ResourceBundle resourceBundle) { //JavaFX Application Thread
+    public void initialize(URL url, ResourceBundle resourceBundle) { //Thread of JavaFX Application
         try {
             Socket socket = new Socket("localhost", 25250);
             clientController = new ClientController(socket, currentUsername, currentOnlineCnt, chatList, chatContentList);
@@ -163,9 +164,65 @@ public class Controller implements Initializable {
             ClientController.sendMessage(newMessage(name, "", MessageType.Chat));
         }
     }
-
     @FXML
-    public void createGroupChat() {
+    public void createGroupChat() throws IOException {
+        Stage stage = new Stage();
+        stage.setTitle("Select users");
+        stage.setWidth(280);
+        stage.setHeight(400);
+        ScrollPane scrollPane = new ScrollPane();// 使用一个滚动板面
+        VBox box = new VBox(); // 滚动板面里放行垂直布局， VBox里放多个复选框
+        Button button = new Button("OK");
+        button.setOnAction(e -> {
+            stage.close();
+        });
+
+        HashSet<String> select = new HashSet<>();
+        for (String t : userList) {
+            CheckBox cb = new CheckBox(t);
+            if (t.equals(username)) { //the user itself
+                select.add(t);
+                cb.setSelected(true);
+                continue;
+            }
+            cb.selectedProperty().addListener(new ChangeListener<Boolean>() {
+                public void changed(ObservableValue<? extends Boolean> ov,
+                                    Boolean old_val, Boolean new_val) {
+                    if (cb.isSelected()) {
+                        select.add(t);
+                    } else {
+                        select.remove(t);
+                    }
+                }
+            });
+            box.getChildren().add(cb);
+            VBox.setMargin(cb,new Insets(10,10,0,10));// 设置间距
+        }
+        box.getChildren().add(button);
+        VBox.setMargin(button,new Insets(10,10,0,10));
+        scrollPane.setContent(box);
+        Scene scene = new Scene(scrollPane);
+        stage.setScene(scene);
+        stage.showAndWait();
+
+        if (select.size() > 1) {
+            StringBuilder chatName = new StringBuilder();
+            List<String>res = select.stream().sorted().limit(3).collect(Collectors.toList());
+            for (int i = 0;i < res.size();i++) {
+                chatName.append(res.get(i));
+                if (i < res.size()-1) {
+                    chatName.append(", ");
+                }
+            }
+            if (select.size() > 3) {
+                chatName.append("...");
+            }
+            chatName.append(" (").append(select.size()).append(")");
+            String finalChatName = chatName.toString();
+            currentChatName = finalChatName;
+            String s = select.toString();
+            groupChatHandler(finalChatName, s.substring(1, s.length() - 1));
+        }
         /*
          * A new dialog should contain a multi-select list, showing all user's name.
          * You can select several users that will be joined in the group chat, including yourself.
@@ -177,8 +234,20 @@ public class Controller implements Initializable {
          * UserA, UserB (2)
          */
     }
-    private static Message newMessage(String sendTo, String data, MessageType type) {
-        return new Message(System.currentTimeMillis(), username, sendTo, data, type);
+    public void groupChatHandler(String finalChatName, String userList) throws IOException {
+        Chat c = allChats.get(finalChatName);
+        if (c != null) {
+            chatContentList.getItems().clear();
+            chatContentList.getItems().setAll(c.getMessages());
+        } else { //new group chat
+            Chat groupChat = new Chat(finalChatName, userList);
+            allChats.put(finalChatName, groupChat);
+            chatList.getItems().add(finalChatName);
+            Message message = newMessage(userList, "", MessageType.Chat);
+            message.chatName = finalChatName;
+            message.isGroup = true;
+            ClientController.sendMessage(message);
+        }
     }
 
     @FXML
@@ -214,6 +283,10 @@ public class Controller implements Initializable {
         if (!data.equals("")) {
             Chat c = allChats.get(currentChatName);
             Message message = newMessage(c.getClientViewUsers(), data, MessageType.Chat);
+            if (c.isGroup) {
+                message.chatName = currentChatName;
+                message.isGroup = true;
+            }
             c.getMessages().add(message);
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
@@ -222,6 +295,9 @@ public class Controller implements Initializable {
         } else {
             generateAlert("Please input something!");
         }
+    }
+    private static Message newMessage(String sendTo, String data, MessageType type) {
+        return new Message(System.currentTimeMillis(), username, sendTo, data, type);
     }
 
     private static class ClientController implements Runnable {
@@ -289,7 +365,8 @@ public class Controller implements Initializable {
                                 String finalChatName = chatName;
                                 if (c == null) { //new chat
                                     if (message.isGroup){ //group
-                                        c = new Chat(chatName,receiver);
+                                        c = new Chat(chatName, receiver);
+                                        c.isGroup = true;
                                     } else { //private
                                         c = new Chat(chatName);
                                     }
@@ -303,16 +380,14 @@ public class Controller implements Initializable {
                                     Platform.runLater(() -> {
                                         generateAlert("[New Message] " + finalChatName);
                                     });
+                                    if (currentChatName != null && currentChatName.equals(chatName)) {
+                                        Chat finalC = c;
+                                        Platform.runLater(() -> {
+                                            chatContentList.getItems().clear();
+                                            chatContentList.getItems().setAll(finalC.getMessages());
+                                        });
+                                    }
                                 }
-
-//                                if (currentChatName == null) { // if no current chat, update the chatContent
-//                                    currentChatName = chatName;
-//                                    Chat finalC = c;
-//                                    Platform.runLater(() -> {
-//                                        chatContentList.getItems().clear();
-//                                        chatContentList.getItems().setAll(finalC.getMessages());
-//                                    });
-//                                }
                                 break;
                             case Logout:
                                 break;

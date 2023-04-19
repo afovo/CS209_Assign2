@@ -57,14 +57,16 @@ public class Main {
                             case Login:
                                 break;
                             case Chat:
-                                if (inputMsg.isGroup){//group chat
-                                    String[]receivers = receiver.split(",");
+                                if (inputMsg.isGroup){ //group chat
+                                    String[]receivers = receiver.split(", ");
                                     for (String r:receivers) {
-                                        writers.get(r).writeObject(inputMsg);
+                                        if (!r.equals(sender)) {
+                                            writers.get(r).writeObject(inputMsg);
+                                        }
                                     }
-                                } else {
+                                } else { //private chat
                                     if (sender.equals(receiver)) {
-                                        //do nothing
+                                        //self chatting, do nothing
                                     } else {
                                         if (writers.get(receiver) != null) { // if still online
                                             writers.get(receiver).writeObject(inputMsg);
