@@ -30,6 +30,9 @@ public class Controller implements Initializable {
     static HashMap<String, Chat> allChats;
     static String currentChatName;
     @FXML
+    public Label currentChatMembers;
+
+    @FXML
     public ListView<String> chatList;
     @FXML
     ListView<Message> chatContentList;
@@ -53,7 +56,8 @@ public class Controller implements Initializable {
     public void initialize(URL url, ResourceBundle resourceBundle) { //Thread of JavaFX Application
         try {
             Socket socket = new Socket("localhost", 25250);
-            clientController = new ClientController(socket, currentUsername, currentOnlineCnt, chatList, chatContentList);
+            clientController = new ClientController(socket, currentUsername, currentOnlineCnt,
+                    chatList, chatContentList, currentChatMembers);
             new Thread(clientController).start();
             loginFrameInitialize();
             //ToDo: local history
@@ -158,6 +162,7 @@ public class Controller implements Initializable {
         if (c != null) {
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
+            currentChatMembers.setText(c.getClientViewUsers());
         } else { //new private chat
             allChats.put(name, new Chat(name));
             chatList.getItems().add(name);
@@ -182,7 +187,6 @@ public class Controller implements Initializable {
             CheckBox cb = new CheckBox(t);
             if (t.equals(username)) { //the user itself
                 select.add(t);
-                cb.setSelected(true);
                 continue;
             }
             cb.selectedProperty().addListener(new ChangeListener<Boolean>() {
@@ -234,16 +238,17 @@ public class Controller implements Initializable {
          * UserA, UserB (2)
          */
     }
-    public void groupChatHandler(String finalChatName, String userList) throws IOException {
+    public void groupChatHandler(String finalChatName, String members) throws IOException {
         Chat c = allChats.get(finalChatName);
         if (c != null) {
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
+            currentChatMembers.setText(c.getClientViewUsers());
         } else { //new group chat
-            Chat groupChat = new Chat(finalChatName, userList);
+            Chat groupChat = new Chat(finalChatName, members);
             allChats.put(finalChatName, groupChat);
             chatList.getItems().add(finalChatName);
-            Message message = newMessage(userList, "", MessageType.Chat);
+            Message message = newMessage(members, "", MessageType.Chat);
             message.chatName = finalChatName;
             message.isGroup = true;
             ClientController.sendMessage(message);
@@ -290,6 +295,7 @@ public class Controller implements Initializable {
             c.getMessages().add(message);
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
+            currentChatMembers.setText(c.getClientViewUsers());
             inputArea.clear();
             ClientController.sendMessage(message);
         } else {
@@ -299,112 +305,6 @@ public class Controller implements Initializable {
     private static Message newMessage(String sendTo, String data, MessageType type) {
         return new Message(System.currentTimeMillis(), username, sendTo, data, type);
     }
-
-    private static class ClientController implements Runnable {
-        Socket socket;
-        private static ObjectOutputStream output;
-        private static ObjectInputStream input;
-        private Label currentUsername;
-        private Label currentOnlineCnt;
-        private ListView<String> chatList;
-        private ListView<Message> chatContentList;
-
-        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt, ListView<String>chatList,
-                                ListView<Message>chatContentList) {
-            this.socket = socket;
-            this.currentUsername = currentUserName;
-            this.currentOnlineCnt = currentOnlineCnt;
-            this.chatList = chatList;
-            this.chatContentList = chatContentList;
-        }
-
-        public static void sendMessage(Message msg) throws IOException {
-            output.writeObject(msg);
-            output.flush();
-        }
-
-        @Override
-        public void run() {
-            try {
-                output = new ObjectOutputStream(socket.getOutputStream());
-                input = new ObjectInputStream(socket.getInputStream());
-                while (socket.isConnected()) {
-                    Message message;
-                    message = (Message) input.readObject();
-                    if (message != null) {
-                        System.out.println("Message received:" + message.getData() + " MessageType:" + message.getType());
-                        String sender = message.getSentBy();
-                        String receiver = message.getSendTo();
-                        String chatName = message.chatName;
-                        switch (message.getType()) {
-                            case Register:
-                                Platform.runLater(() -> {
-                                    generateAlert(message.getData());
-                                    if (message.getData().equals("The user name already exists, please try again.")) {
-                                        Platform.exit();
-                                        System.exit(-1);
-                                    } else {
-                                        currentUsername.setText(username);
-                                    }
-                                });
-                                break;
-                            case Login:
-                                break;
-                            case UpdateUserList:
-                                String names = message.getData();
-                                userList = names.substring(1, names.length() - 1).split(", ");
-                                Platform.runLater(() -> {
-                                    currentOnlineCnt.setText("Online: " + userList.length);
-                                });
-                                break;
-                            case Chat:
-                                if (!message.isGroup) {
-                                    chatName = sender;
-                                }
-                                Chat c = allChats.get(chatName);
-                                String finalChatName = chatName;
-                                if (c == null) { //new chat
-                                    if (message.isGroup){ //group
-                                        c = new Chat(chatName, receiver);
-                                        c.isGroup = true;
-                                    } else { //private
-                                        c = new Chat(chatName);
-                                    }
-                                    allChats.put(chatName, c);
-                                    Platform.runLater(() -> {
-                                        generateAlert("[New Chat] " + finalChatName);
-                                        chatList.getItems().add(finalChatName);
-                                    });
-                                } else { //existing chat
-                                    c.getMessages().add(message);
-                                    Platform.runLater(() -> {
-                                        generateAlert("[New Message] " + finalChatName);
-                                    });
-                                    if (currentChatName != null && currentChatName.equals(chatName)) {
-                                        Chat finalC = c;
-                                        Platform.runLater(() -> {
-                                            chatContentList.getItems().clear();
-                                            chatContentList.getItems().setAll(finalC.getMessages());
-                                        });
-                                    }
-                                }
-                                break;
-                            case Logout:
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                }
-            } catch (IOException | ClassNotFoundException e) {
-                Platform.runLater(() -> {
-                    generateAlert("The server has been shut down :(");
-                    Platform.exit();
-                });
-            }
-        }
-    }
-
     private class MessageCellFactory implements Callback<ListView<Message>, ListCell<Message>> {
         @Override
         public ListCell<Message> call(ListView<Message> param) {
@@ -447,9 +347,130 @@ public class Controller implements Initializable {
         @Override
         public void changed(ObservableValue<?> observable, Object oldValue, Object newValue) {
             currentChatName = (String) newValue;
+            Chat c = allChats.get(currentChatName);
             chatContentList.getItems().clear();
-            chatContentList.getItems().setAll(allChats.get(currentChatName).getMessages());
+            chatContentList.getItems().setAll(c.getMessages());
+            currentChatMembers.setText(c.getClientViewUsers());
             System.out.println(newValue);
         }
     }
+
+    private static class ClientController implements Runnable {
+        Socket socket;
+        private static ObjectOutputStream output;
+        private static ObjectInputStream input;
+        private Label currentUsername;
+        private Label currentOnlineCnt;
+        private ListView<String> chatList;
+        private ListView<Message> chatContentList;
+        private Label currentChatMembers;
+
+        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt, ListView<String>chatList,
+                                ListView<Message>chatContentList, Label currentChatMembers) {
+            this.socket = socket;
+            this.currentUsername = currentUserName;
+            this.currentOnlineCnt = currentOnlineCnt;
+            this.chatList = chatList;
+            this.chatContentList = chatContentList;
+            this.currentChatMembers = currentChatMembers;
+        }
+
+        public static void sendMessage(Message msg) throws IOException {
+            output.writeObject(msg);
+            output.flush();
+        }
+
+        @Override
+        public void run() {
+            try {
+                output = new ObjectOutputStream(socket.getOutputStream());
+                input = new ObjectInputStream(socket.getInputStream());
+                while (socket.isConnected()) {
+                    Message message;
+                    message = (Message) input.readObject();
+                    if (message != null) {
+                        System.out.println("Message received:" + message.getData() + " MessageType:" + message.getType());
+                        String sender = message.getSentBy();
+                        String receiver = message.getSendTo();
+                        String chatName = message.chatName;
+                        switch (message.getType()) {
+                            case Register:
+                                Platform.runLater(() -> {
+                                    generateAlert(message.getData());
+                                    if (message.getData().equals("The user name already exists, please try again.")) {
+                                        Platform.exit();
+                                        System.exit(-1);
+                                    } else {
+                                        currentUsername.setText(username);
+                                    }
+                                });
+                                break;
+                            case Login:
+                                break;
+                            case UpdateUserList:
+                                String names = message.getData();
+                                String[]list = names.substring(1, names.length() - 1).split(", ");
+                                if (userList != null && list.length < userList.length) { //A user left
+                                    HashSet<String>old = new HashSet<>(Arrays.asList(userList));
+                                    HashSet<String>current = new HashSet<>(Arrays.asList(list));
+                                    old.removeAll(current);
+                                    String removed = old.toString().substring(1, old.toString().length()-1);
+                                    Platform.runLater(() -> {
+                                        generateAlert(removed + " left the platform👋");
+                                    });
+                                }
+                                userList = list;
+                                Platform.runLater(() -> {
+                                    currentOnlineCnt.setText("Online: " + userList.length);
+                                });
+                                break;
+                            case Chat:
+                                if (!message.isGroup) {
+                                    chatName = sender;
+                                }
+                                Chat c = allChats.get(chatName);
+                                String finalChatName = chatName;
+                                if (c == null) { //new chat
+                                    if (message.isGroup){ //group
+                                        c = new Chat(chatName, receiver);
+                                        c.isGroup = true;
+                                    } else { //private
+                                        c = new Chat(chatName);
+                                    }
+                                    allChats.put(chatName, c);
+                                    Platform.runLater(() -> {
+                                        generateAlert("[New Chat] " + finalChatName);
+                                        chatList.getItems().add(finalChatName);
+                                    });
+                                } else { //existing chat
+                                    c.getMessages().add(message);
+                                    Platform.runLater(() -> {
+                                        generateAlert("[New Message] " + finalChatName);
+                                    });
+                                    if (currentChatName != null && currentChatName.equals(chatName)) {
+                                        Chat finalC = c;
+                                        Platform.runLater(() -> {
+                                            chatContentList.getItems().clear();
+                                            chatContentList.getItems().setAll(finalC.getMessages());
+                                            currentChatMembers.setText(finalC.getClientViewUsers());
+                                        });
+                                    }
+                                }
+                                break;
+                            case Logout:
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                Platform.runLater(() -> {
+                    generateAlert("The server has been shut down :(");
+                    Platform.exit();
+                });
+            }
+        }
+    }
+
 }

@@ -52,7 +52,7 @@ public class Main {
                             case Register:
                                 addToList(inputMsg);
                                 writers.put(sender,output);
-                                notifyAll(newMessage(userList.keySet().toString(),MessageType.UpdateUserList));
+                                updateAllUserLists();
                                 break;
                             case Login:
                                 break;
@@ -84,12 +84,22 @@ public class Main {
                 closeConnection();
             } catch (DuplicatedUserNameException exception) {
                 try {
-                    output.writeObject(newMessage("The user name already exists, please try again.",MessageType.Register));
+                    output.writeObject(newMessage("The user name already exists, please try again.",
+                            user.getName(), MessageType.Register));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             } catch (Exception e){
                 System.err.println("Exception in run() method for user: " + user.getName() + e);
+            }
+        }
+
+        private void updateAllUserLists() throws IOException {//update userList, notify all
+            ObjectOutputStream writer;
+            for (String receiver : writers.keySet()) {
+                writer = writers.get(receiver);
+                writer.writeObject(newMessage(userList.keySet().toString(), receiver, MessageType.UpdateUserList));
+                writer.reset();
             }
         }
 
@@ -105,7 +115,6 @@ public class Main {
 //            return msg;
 //        }
 //
-
         private void addToList(Message inputMsg) throws IOException, DuplicatedUserNameException {
             String name = inputMsg.getSentBy();
             user = new User(name);
@@ -113,36 +122,24 @@ public class Main {
                 user.setStatus(UserStatus.ONLINE);
                 userList.put(name, user);
                 System.out.println("[Server] "+ name + " has been added to the list");
-                Message msg = newMessage("[Server] You ("+name+") have joined the chat!", MessageType.Register);
+                Message msg = newMessage("[Server] You ("+name+") have joined the chat!",
+                        name, MessageType.Register);
                 output.writeObject(msg);
                 output.flush();
             } else {
                 throw new DuplicatedUserNameException(name + " is already connected");
             }
         }
-
+        /*
+         * Once a user has been disconnected, we close the open connections and remove the writers
+         */
         private void removeFromList() throws IOException{
             if (userList != null) {
                 userList.remove(user.getName());
                 System.out.println("User: " + user.getName() + " has been removed!");
-                notifyAll(newMessage(userList.keySet().toString(), MessageType.UpdateUserList));
+                updateAllUserLists();
             }
         }
-
-        private Message newMessage(String data, MessageType type){
-            return new Message(System.currentTimeMillis(),"server",user.getName(),data,type);
-        }
-
-        private void notifyAll(Message msg) throws IOException {//notify All
-            for (ObjectOutputStream writer : writers.values()) {
-                writer.writeObject(msg);
-                writer.reset();
-            }
-        }
-
-        /*
-         * Once a user has been disconnected, we close the open connections and remove the writers
-         */
         private synchronized void closeConnection(){
             if (output != null){
                 writers.remove(user.getName());
@@ -164,6 +161,9 @@ public class Main {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        }
+        private Message newMessage(String data, String sendTo, MessageType type){
+            return new Message(System.currentTimeMillis(),"server",sendTo,data,type);
         }
     }
 }

@@ -24,10 +24,11 @@
     </MenuBar>
     <SplitPane dividerPositions="0.25" focusTraversable="true" VBox.vgrow="ALWAYS">
         <ListView fx:id="chatList" prefHeight="200.0" prefWidth="200.0" />
-        <SplitPane dividerPositions="0.85" orientation="VERTICAL" prefHeight="200.0" prefWidth="160.0">
-            <ListView fx:id="chatContentList" prefHeight="200.0" prefWidth="200.0" />
-            <HBox prefHeight="100.0" prefWidth="200.0">
-                <TextArea fx:id="inputArea" prefHeight="80.0" prefWidth="593.0" HBox.hgrow="ALWAYS" />
+        <SplitPane dividerPositions="0.85, 1.26" orientation="VERTICAL" prefHeight="200.0" prefWidth="160.0">
+         <Label fx:id="currentChatMembers" text="Chat Member(s)" />
+            <ListView fx:id="chatContentList" prefHeight="226.0" prefWidth="745.0" />
+            <HBox prefHeight="226.0" prefWidth="670.0">
+                <TextArea fx:id="inputArea" prefHeight="140.0" prefWidth="550.0" HBox.hgrow="ALWAYS" />
             <Button fx:id="emoji" mnemonicParsing="false" onAction="#showEmojiList" prefHeight="80.0" prefWidth="69.0" text="😊">
                <font>
                   <Font size="18.0" />
