@@ -60,7 +60,7 @@ public class Main {
                                 if (inputMsg.isGroup){ //group chat
                                     String[]receivers = receiver.split(", ");
                                     for (String r:receivers) {
-                                        if (!r.equals(sender)) {
+                                        if (!r.equals(sender) && writers.get(r)!=null) {
                                             writers.get(r).writeObject(inputMsg);
                                         }
                                     }

@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -22,6 +24,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
@@ -31,7 +34,6 @@ public class Controller implements Initializable {
     static String currentChatName;
     @FXML
     public Label currentChatMembers;
-
     @FXML
     public ListView<String> chatList;
     @FXML
@@ -42,12 +44,14 @@ public class Controller implements Initializable {
     @FXML
     public Button emoji;
     @FXML
+    public Button fileBtn;
+    @FXML
     public Button send;
+
     @FXML
     public Label currentUsername;
     @FXML
     public Label currentOnlineCnt;
-
     static String username;
     static String[]userList;
     ClientController clientController; //Thread for message sending/receiving
@@ -60,7 +64,6 @@ public class Controller implements Initializable {
                     chatList, chatContentList, currentChatMembers);
             new Thread(clientController).start();
             loginFrameInitialize();
-            //ToDo: local history
             ListSelectListener chatListener = new ListSelectListener();
             chatList.getSelectionModel().selectedItemProperty().addListener(chatListener);
             chatContentList.setCellFactory(new MessageCellFactory());
@@ -255,6 +258,29 @@ public class Controller implements Initializable {
         }
     }
 
+    public void setSendFileHandler() {
+        fileBtn.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent arg0) {
+                Stage stage = new Stage();
+                FileChooser fileChooser = new FileChooser();
+                //设置文件上传类型
+                FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("excel files (*.xlsx)", "*.xlsx");
+                fileChooser.getExtensionFilters().add(extFilter);
+                File file = fileChooser.showOpenDialog(stage);
+                inputArea.setText("📂| " + file.getPath());
+
+                //          业务逻辑代码
+
+//                FileChooser fileChooserSave = new FileChooser();
+//                //保存文件类型
+//                FileChooser.ExtensionFilter extFilter1 = new FileChooser.ExtensionFilter("excel files (*.xlsx)", "*.xlsx");
+//                fileChooserSave.getExtensionFilters().add(extFilter1);
+//                File fileSave = fileChooserSave.showSaveDialog(primaryStage);
+//                textArea.appendText("\n" + "你保存的文件路径为：" + fileSave.getPath());
+            }
+        });
+    }
     @FXML
     public void showEmojiList() {
         AtomicReference<String> emoji = new AtomicReference<>();
