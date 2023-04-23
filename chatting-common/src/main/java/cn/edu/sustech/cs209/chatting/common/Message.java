@@ -4,8 +4,6 @@ package cn.edu.sustech.cs209.chatting.common;
 import java.io.Serializable;
 
 public class Message implements Serializable {
-    public String chatName;//groupName or person(default)
-
     private Long timestamp;
 
     private String sentBy;
@@ -14,7 +12,11 @@ public class Message implements Serializable {
 
     private String data;
 
+    private byte[]file;
+
     private MessageType type;
+    public String chatName;//groupName or person(default)
+
 
     public Boolean isGroup;
     public Message(Long timestamp, String sentBy, String sendTo, String data, MessageType type) {
@@ -23,6 +25,7 @@ public class Message implements Serializable {
         this.sentBy = sentBy;
         this.sendTo = sendTo;
         this.data = data;
+        this.file = null;
         this.type = type;
         this.isGroup = false;
     }
@@ -42,6 +45,12 @@ public class Message implements Serializable {
     public String getData() {
         return data;
     }
+
+    public void setData(String data) {this.data = data;}
+
+    public byte[] getFile() {return file;}
+
+    public void setFile(byte[]file) {this.file = file;}
 
     public MessageType getType() {return type;}
 }

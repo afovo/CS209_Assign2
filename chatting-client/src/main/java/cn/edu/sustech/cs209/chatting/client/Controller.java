@@ -24,6 +24,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -67,6 +68,7 @@ public class Controller implements Initializable {
             ListSelectListener chatListener = new ListSelectListener();
             chatList.getSelectionModel().selectedItemProperty().addListener(chatListener);
             chatContentList.setCellFactory(new MessageCellFactory());
+            setSendFileHandler();
             allChats = new HashMap<>();
         } catch (IOException e) {
             Platform.runLater(() -> {
@@ -264,20 +266,12 @@ public class Controller implements Initializable {
             public void handle(ActionEvent arg0) {
                 Stage stage = new Stage();
                 FileChooser fileChooser = new FileChooser();
-                //设置文件上传类型
-                FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("excel files (*.xlsx)", "*.xlsx");
-                fileChooser.getExtensionFilters().add(extFilter);
+                //  FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("excel files (*.xlsx)", "*.xlsx");
+                //  FileChooser.getExtensionFilters().add(extFilter);
                 File file = fileChooser.showOpenDialog(stage);
-                inputArea.setText("📂| " + file.getPath());
-
-                //          业务逻辑代码
-
-//                FileChooser fileChooserSave = new FileChooser();
-//                //保存文件类型
-//                FileChooser.ExtensionFilter extFilter1 = new FileChooser.ExtensionFilter("excel files (*.xlsx)", "*.xlsx");
-//                fileChooserSave.getExtensionFilters().add(extFilter1);
-//                File fileSave = fileChooserSave.showSaveDialog(primaryStage);
-//                textArea.appendText("\n" + "你保存的文件路径为：" + fileSave.getPath());
+                if (file != null) {
+                    inputArea.setText("File📂| " + file.getPath());
+                }
             }
         });
     }
@@ -318,6 +312,25 @@ public class Controller implements Initializable {
                 message.chatName = currentChatName;
                 message.isGroup = true;
             }
+            if (data.startsWith("File")) {
+                FileInputStream in;
+                try {
+                    String[ ]filePath = data.split("\\| ");
+                    in = new FileInputStream(filePath[1]);
+                    byte[] b = new byte[in.available()];
+                    int flag = in.read(b);
+                    if (flag != -1) {
+                        String [] initialFile = data.split("\\\\");
+                        message.setData(initialFile[initialFile.length-1]);
+                        message.setFile(b);
+                    } else {
+                        generateAlert("The file has no contents :(");
+                        return;
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             c.getMessages().add(message);
             chatContentList.getItems().clear();
             chatContentList.getItems().setAll(c.getMessages());
@@ -348,6 +361,31 @@ public class Controller implements Initializable {
                     HBox wrapper = new HBox();
                     Label nameLabel = new Label(msg.getSentBy());
                     Label msgLabel = new Label(msg.getData());
+                    Button fileBtn = null;
+
+                    if (msg.getFile() != null) {
+                        fileBtn = new Button();
+                        fileBtn.setText("Download");
+                        fileBtn.setOnAction(new EventHandler<ActionEvent>() {
+                            @Override
+                            public void handle(ActionEvent arg0) {
+                                Stage stage = new Stage();
+                                DirectoryChooser directoryChooser = new DirectoryChooser();
+                                File folder = directoryChooser.showDialog(stage);
+                                if (folder!= null) {
+                                    FileOutputStream out;
+                                    try {
+                                        out = new FileOutputStream(folder.getPath()+"\\"+msg.getData());
+                                        out.write(msg.getFile());
+                                        out.close();
+                                        generateAlert("The file is saved as "+ folder.getPath()+"\\"+msg.getData());
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+                            }
+                        });
+                    }
 
                     nameLabel.setPrefSize(50, 20);
                     nameLabel.setWrapText(true);
@@ -355,14 +393,24 @@ public class Controller implements Initializable {
 
                     if (username.equals(msg.getSentBy())) {
                         wrapper.setAlignment(Pos.TOP_RIGHT);
-                        wrapper.getChildren().addAll(msgLabel, nameLabel);
+                        wrapper.getChildren().add(msgLabel);
                         msgLabel.setPadding(new Insets(0, 20, 0, 0));
+                        if (fileBtn != null) {
+                            wrapper.getChildren().add(fileBtn);
+                            fileBtn.setPadding(new Insets(0, 20, 0, 0));
+                        }
+                        wrapper.getChildren().add(nameLabel);
                     } else {
                         wrapper.setAlignment(Pos.TOP_LEFT);
-                        wrapper.getChildren().addAll(nameLabel, msgLabel);
+                        wrapper.getChildren().add(nameLabel);
+                        wrapper.getChildren().add(msgLabel);
                         msgLabel.setPadding(new Insets(0, 0, 0, 20));
-                    }
+                        if (fileBtn != null) {
+                            wrapper.getChildren().add(fileBtn);
+                            fileBtn.setPadding(new Insets(0, 0, 0, 20));
+                        }
 
+                    }
                     setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
                     setGraphic(wrapper);
                 }
