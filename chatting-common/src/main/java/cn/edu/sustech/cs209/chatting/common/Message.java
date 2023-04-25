@@ -8,14 +8,14 @@ public class Message implements Serializable {
 
     private String sentBy;
 
-    private String sendTo;//group:a,b,c,d,...
+    private String sendTo; //group:a,b,c,d,...
 
     private String data;
 
     private byte[]file;
 
     private MessageType type;
-    public String chatName;//groupName or person(default)
+    public String chatName; //groupName or person(default)
 
 
     public Boolean isGroup;

@@ -135,6 +135,7 @@ public class Controller implements Initializable {
         alert.setContentText(info);
         alert.showAndWait();
     }
+
     @FXML
     public void createPrivateChat() throws IOException {
         AtomicReference<String> user = new AtomicReference<>();
@@ -162,6 +163,7 @@ public class Controller implements Initializable {
             privateChatHandler(name);
         }
     }
+
     public void privateChatHandler(String name) throws IOException {
         Chat c = allChats.get(name);
         if (c != null) {
@@ -174,13 +176,14 @@ public class Controller implements Initializable {
             ClientController.sendMessage(newMessage(name, "", MessageType.Chat));
         }
     }
+
     @FXML
     public void createGroupChat() throws IOException {
         Stage stage = new Stage();
         stage.setTitle("Select users");
         stage.setWidth(280);
         stage.setHeight(400);
-        ScrollPane scrollPane = new ScrollPane();// 使用一个滚动板面
+        ScrollPane scrollPane = new ScrollPane(); // 使用一个滚动板面
         VBox box = new VBox(); // 滚动板面里放行垂直布局， VBox里放多个复选框
         Button button = new Button("OK");
         button.setOnAction(e -> {
@@ -205,10 +208,10 @@ public class Controller implements Initializable {
                 }
             });
             box.getChildren().add(cb);
-            VBox.setMargin(cb,new Insets(10,10,0,10));// 设置间距
+            VBox.setMargin(cb, new Insets(10, 10, 0, 10)); // 设置间距
         }
         box.getChildren().add(button);
-        VBox.setMargin(button,new Insets(10,10,0,10));
+        VBox.setMargin(button, new Insets(10, 10, 0, 10));
         scrollPane.setContent(box);
         Scene scene = new Scene(scrollPane);
         stage.setScene(scene);
@@ -216,10 +219,10 @@ public class Controller implements Initializable {
 
         if (select.size() > 1) {
             StringBuilder chatName = new StringBuilder();
-            List<String>res = select.stream().sorted().limit(3).collect(Collectors.toList());
-            for (int i = 0;i < res.size();i++) {
+            List<String> res = select.stream().sorted().limit(3).collect(Collectors.toList());
+            for (int i = 0; i < res.size(); i++) {
                 chatName.append(res.get(i));
-                if (i < res.size()-1) {
+                if (i < res.size() - 1) {
                     chatName.append(", ");
                 }
             }
@@ -243,6 +246,7 @@ public class Controller implements Initializable {
          * UserA, UserB (2)
          */
     }
+
     public void groupChatHandler(String finalChatName, String members) throws IOException {
         Chat c = allChats.get(finalChatName);
         if (c != null) {
@@ -266,8 +270,6 @@ public class Controller implements Initializable {
             public void handle(ActionEvent arg0) {
                 Stage stage = new Stage();
                 FileChooser fileChooser = new FileChooser();
-                //  FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("excel files (*.xlsx)", "*.xlsx");
-                //  FileChooser.getExtensionFilters().add(extFilter);
                 File file = fileChooser.showOpenDialog(stage);
                 if (file != null) {
                     inputArea.setText("File📂| " + file.getPath());
@@ -295,9 +297,10 @@ public class Controller implements Initializable {
         stage.setScene(new Scene(box));
         stage.showAndWait();
         if (emoji.get() != null) {
-            inputArea.setText(inputArea.getText()+emoji.get());
+            inputArea.setText(inputArea.getText() + emoji.get());
         }
     }
+
     @FXML
     public void doSendChat() throws IOException {
         if (currentChatName == null) {
@@ -321,7 +324,7 @@ public class Controller implements Initializable {
                     int flag = in.read(b);
                     if (flag != -1) {
                         String [] initialFile = data.split("\\\\");
-                        message.setData(initialFile[initialFile.length-1]);
+                        message.setData(initialFile[initialFile.length - 1]);
                         message.setFile(b);
                     } else {
                         generateAlert("The file has no contents :(");
@@ -341,9 +344,11 @@ public class Controller implements Initializable {
             generateAlert("Please input something!");
         }
     }
+
     private static Message newMessage(String sendTo, String data, MessageType type) {
         return new Message(System.currentTimeMillis(), username, sendTo, data, type);
     }
+
     private class MessageCellFactory implements Callback<ListView<Message>, ListCell<Message>> {
         @Override
         public ListCell<Message> call(ListView<Message> param) {
@@ -372,13 +377,14 @@ public class Controller implements Initializable {
                                 Stage stage = new Stage();
                                 DirectoryChooser directoryChooser = new DirectoryChooser();
                                 File folder = directoryChooser.showDialog(stage);
-                                if (folder!= null) {
+                                if (folder != null) {
                                     FileOutputStream out;
                                     try {
-                                        out = new FileOutputStream(folder.getPath()+"\\"+msg.getData());
+                                        out = new FileOutputStream(folder.getPath() + "\\" + msg.getData());
                                         out.write(msg.getFile());
                                         out.close();
-                                        generateAlert("The file is saved as "+ folder.getPath()+"\\"+msg.getData());
+                                        generateAlert("The file is saved as " +
+                                                folder.getPath() + "\\" + msg.getData());
                                     } catch (IOException e) {
                                         throw new RuntimeException(e);
                                     }
@@ -439,8 +445,8 @@ public class Controller implements Initializable {
         private ListView<Message> chatContentList;
         private Label currentChatMembers;
 
-        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt, ListView<String>chatList,
-                                ListView<Message>chatContentList, Label currentChatMembers) {
+        public ClientController(Socket socket, Label currentUserName, Label currentOnlineCnt, ListView<String> chatList,
+                                ListView<Message> chatContentList, Label currentChatMembers) {
             this.socket = socket;
             this.currentUsername = currentUserName;
             this.currentOnlineCnt = currentOnlineCnt;
@@ -485,10 +491,10 @@ public class Controller implements Initializable {
                                 String names = message.getData();
                                 String[]list = names.substring(1, names.length() - 1).split(", ");
                                 if (userList != null && list.length < userList.length) { //A user left
-                                    HashSet<String>old = new HashSet<>(Arrays.asList(userList));
-                                    HashSet<String>current = new HashSet<>(Arrays.asList(list));
+                                    HashSet<String> old = new HashSet<>(Arrays.asList(userList));
+                                    HashSet<String> current = new HashSet<>(Arrays.asList(list));
                                     old.removeAll(current);
-                                    String removed = old.toString().substring(1, old.toString().length()-1);
+                                    String removed = old.toString().substring(1, old.toString().length() - 1);
                                     Platform.runLater(() -> {
                                         generateAlert(removed + " left the platform👋");
                                     });
@@ -505,7 +511,7 @@ public class Controller implements Initializable {
                                 Chat c = allChats.get(chatName);
                                 String finalChatName = chatName;
                                 if (c == null) { //new chat
-                                    if (message.isGroup){ //group
+                                    if (message.isGroup) { //group
                                         c = new Chat(chatName, receiver);
                                         c.isGroup = true;
                                     } else { //private

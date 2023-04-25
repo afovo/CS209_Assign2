@@ -2,15 +2,13 @@ package cn.edu.sustech.cs209.chatting.server;
 
 import cn.edu.sustech.cs209.chatting.common.*;
 import cn.edu.sustech.cs209.chatting.server.Exceptions.DuplicatedUserNameException;
-
-
-import java.net.*;
 import java.io.*;
+import java.net.*;
 import java.util.*;
 
 public class Main {
-    public static HashMap<String,User> userList = new HashMap<>();
-    public static ArrayList<Chat> chatList = new ArrayList<>();
+    public static HashMap<String, User> userList = new HashMap<>();
+//    public static ArrayList<Chat> chatList = new ArrayList<>();
     private static HashMap<String, ObjectOutputStream> writers = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
@@ -18,7 +16,7 @@ public class Main {
         ServerSocket server = new ServerSocket(25250);
         System.out.println("-----[Server] Waiting connection-----");
 
-        while(true){
+        while (true) {
             Socket sock = server.accept();
             ServerController serverController = new ServerController(sock);
             serverController.start();
@@ -51,16 +49,16 @@ public class Main {
                         switch (inputMsg.getType()) {
                             case Register:
                                 addToList(inputMsg);
-                                writers.put(sender,output);
+                                writers.put(sender, output);
                                 updateAllUserLists();
                                 break;
                             case Login:
                                 break;
                             case Chat:
-                                if (inputMsg.isGroup){ //group chat
+                                if (inputMsg.isGroup) { //group chat
                                     String[]receivers = receiver.split(", ");
-                                    for (String r:receivers) {
-                                        if (!r.equals(sender) && writers.get(r)!=null) {
+                                    for (String r : receivers) {
+                                        if (!r.equals(sender) && writers.get(r) != null) {
                                             writers.get(r).writeObject(inputMsg);
                                         }
                                     }
@@ -76,11 +74,12 @@ public class Main {
                                 break;
                             case Logout:
                                 break;
+                            default:
+                                break;
                         }
                     }
                 }
             } catch (SocketException socketException) {
-//                System.err.println("Socket Exception for user " + user.getName());
                 closeConnection();
             } catch (DuplicatedUserNameException exception) {
                 try {
@@ -89,12 +88,12 @@ public class Main {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-            } catch (Exception e){
+            } catch (Exception e) {
                 System.err.println("Exception in run() method for user: " + user.getName() + e);
             }
         }
 
-        private void updateAllUserLists() throws IOException {//update userList, notify all
+        private void updateAllUserLists() throws IOException { //update userList, notify all
             ObjectOutputStream writer;
             for (String receiver : writers.keySet()) {
                 writer = writers.get(receiver);
@@ -114,15 +113,15 @@ public class Main {
 //            write(msg);
 //            return msg;
 //        }
-//
+
         private void addToList(Message inputMsg) throws IOException, DuplicatedUserNameException {
             String name = inputMsg.getSentBy();
             user = new User(name);
             if (!userList.containsKey(name)) {
                 user.setStatus(UserStatus.ONLINE);
                 userList.put(name, user);
-                System.out.println("[Server] "+ name + " has been added to the list");
-                Message msg = newMessage("[Server] You ("+name+") have joined the chat!",
+                System.out.println("[Server] " + name + " has been added to the list");
+                Message msg = newMessage("[Server] You (" + name + ") have joined the chat!",
                         name, MessageType.Register);
                 output.writeObject(msg);
                 output.flush();
@@ -130,18 +129,17 @@ public class Main {
                 throw new DuplicatedUserNameException(name + " is already connected");
             }
         }
-        /*
-         * Once a user has been disconnected, we close the open connections and remove the writers
-         */
-        private void removeFromList() throws IOException{
+
+        private void removeFromList() throws IOException {
             if (userList != null) {
                 userList.remove(user.getName());
                 System.out.println("User: " + user.getName() + " has been removed!");
                 updateAllUserLists();
             }
         }
-        private synchronized void closeConnection(){
-            if (output != null){
+
+        private synchronized void closeConnection() {
+            if (output != null) {
                 writers.remove(user.getName());
                 try {
                     output.close();
@@ -149,7 +147,7 @@ public class Main {
                     e.printStackTrace();
                 }
             }
-            if (input != null){
+            if (input != null) {
                 try {
                     input.close();
                 } catch (IOException e) {
@@ -162,8 +160,9 @@ public class Main {
                 throw new RuntimeException(e);
             }
         }
-        private Message newMessage(String data, String sendTo, MessageType type){
-            return new Message(System.currentTimeMillis(),"server",sendTo,data,type);
+
+        private Message newMessage(String data, String sendTo, MessageType type) {
+            return new Message(System.currentTimeMillis(), "server", sendTo, data, type);
         }
     }
 }

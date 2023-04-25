@@ -7,7 +7,7 @@ import java.util.Set;
 public class Chat {
     private String chatName;
     private Set<User> users;
-    private String clientViewUsers;//a,b,c,...   or simply one name
+    private String clientViewUsers; //a,b,c,...   or simply one name
     private ArrayList<Message> messages;
     public boolean isGroup;
 
@@ -25,7 +25,9 @@ public class Chat {
         this.messages = new ArrayList<>();
     }
 
-    public String getClientViewUsers(){return clientViewUsers;}
+    public String getClientViewUsers() {
+        return clientViewUsers;
+    }
 
     public String getName() {
         return chatName;
